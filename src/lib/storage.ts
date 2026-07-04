@@ -1,16 +1,35 @@
 /**
  * 画像ファイル(data/images/<id>.png)の読み書き層。
- * 実装は persistence 担当が埋める。
  */
 
-export function saveImageFile(_id: string, _png: Buffer): void {
-  throw new Error("not implemented");
+import * as fs from "fs";
+import * as path from "path";
+
+export function saveImageFile(id: string, png: Buffer): void {
+  const imagesDir = path.join(process.cwd(), "data", "images");
+  fs.mkdirSync(imagesDir, { recursive: true });
+
+  const filePath = path.join(imagesDir, `${id}.png`);
+  fs.writeFileSync(filePath, png);
 }
 
-export function readImageFile(_id: string): Buffer | undefined {
-  throw new Error("not implemented");
+export function readImageFile(id: string): Buffer | undefined {
+  const filePath = path.join(process.cwd(), "data", "images", `${id}.png`);
+
+  try {
+    return fs.readFileSync(filePath);
+  } catch {
+    return undefined;
+  }
 }
 
-export function deleteImageFile(_id: string): void {
-  throw new Error("not implemented");
+export function deleteImageFile(id: string): void {
+  const filePath = path.join(process.cwd(), "data", "images", `${id}.png`);
+
+  try {
+    fs.unlinkSync(filePath);
+  } catch {
+    // no-op if file doesn't exist
+  }
 }
+
