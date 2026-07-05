@@ -5,7 +5,7 @@ import { deleteImage, insertImage } from "@/lib/db";
 import { deleteImageFile, saveImageFile } from "@/lib/storage";
 import type { GeneratedImage, GenerationResult, Size, Quality } from "@/lib/types";
 import { findModel } from "@/lib/models";
-import { generateImage } from "@/lib/openai";
+import { cleansePrompt, generateImage } from "@/lib/openai";
 
 /**
  * 画像生成フォームから呼ばれるサーバーアクション。
@@ -21,6 +21,7 @@ export async function generateAction(
     const model = formData.get("model");
     const size = formData.get("size");
     const quality = formData.get("quality");
+    const cleanse = formData.get("cleanse") === "on";
 
     // 型チェックと値の確認
     if (typeof prompt !== "string" || !prompt.trim()) {
@@ -55,10 +56,13 @@ export async function generateAction(
       return { ok: false, error: "選択された品質はこのモデルでは利用できません" };
     }
 
+    // 必要なら gpt-5.4 でプロンプトを練り直す。実際に画像生成へ渡す文面を記録する
+    const finalPrompt = cleanse ? await cleansePrompt(prompt.trim()) : prompt.trim();
+
     // 画像生成
     const id = crypto.randomUUID();
     const buffer = await generateImage({
-      prompt: prompt.trim(),
+      prompt: finalPrompt,
       model,
       size: size as Size,
       quality: quality as Quality,
@@ -70,7 +74,7 @@ export async function generateAction(
     // DB に記録
     const image: GeneratedImage = {
       id,
-      prompt: prompt.trim(),
+      prompt: finalPrompt,
       model,
       size: size as Size,
       quality: quality as Quality,

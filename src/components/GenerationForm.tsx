@@ -130,6 +130,23 @@ export function GenerationForm() {
           </select>
         </div>
 
+        {/* Prompt cleansing toggle */}
+        <div className="flex items-start gap-3 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 p-3">
+          <input
+            type="checkbox"
+            id="cleanse"
+            name="cleanse"
+            disabled={isPending}
+            className="mt-0.5 h-4 w-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+          />
+          <label htmlFor="cleanse" className="text-sm text-foreground">
+            <span className="font-medium">gpt-5.4 でプロンプトを調整してから生成</span>
+            <span className="block text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              入力を画像生成向けに書き直してから渡します(生成時間と料金が少し増えます)
+            </span>
+          </label>
+        </div>
+
         {/* Submit button */}
         <button
           type="submit"
