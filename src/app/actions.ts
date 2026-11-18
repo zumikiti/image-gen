@@ -5,7 +5,8 @@ import { deleteImage, insertImage } from "@/lib/db";
 import { deleteImageFile, saveImageFile } from "@/lib/storage";
 import type { GeneratedImage, GenerationResult, Size, Quality } from "@/lib/types";
 import { findModel } from "@/lib/models";
-import { cleansePrompt, generateImage } from "@/lib/openai";
+import { generateImage } from "@/lib/generate";
+import { cleansePrompt } from "@/lib/openai";
 
 /**
  * 画像生成フォームから呼ばれるサーバーアクション。
