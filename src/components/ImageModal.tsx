@@ -68,6 +68,25 @@ export function ImageModal({
   const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
   const promptRef = useRef<HTMLParagraphElement>(null);
 
+  // 開いておる間は背後のページをスクロールさせない。
+  // スクロールバーが消えるぶんの横ずれは padding で埋める
+  useEffect(() => {
+    const { body } = document;
+    const previousOverflow = body.style.overflow;
+    const previousPaddingRight = body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+
+    body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    return () => {
+      body.style.overflow = previousOverflow;
+      body.style.paddingRight = previousPaddingRight;
+    };
+  }, []);
+
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
