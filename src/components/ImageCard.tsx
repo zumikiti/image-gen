@@ -7,9 +7,11 @@ import type { GeneratedImage } from "@/lib/types";
 interface ImageCardProps {
   image: GeneratedImage;
   onImageClick: () => void;
+  /** フォームの入力欄へプロンプトを流し込む（上書き確認は呼び出し側が担う） */
+  onReusePrompt: () => void;
 }
 
-export function ImageCard({ image, onImageClick }: ImageCardProps) {
+export function ImageCard({ image, onImageClick, onReusePrompt }: ImageCardProps) {
   const [isPending, startTransition] = useTransition();
 
   const handleDelete = () => {
@@ -56,6 +58,15 @@ export function ImageCard({ image, onImageClick }: ImageCardProps) {
 
         {/* Created date */}
         <p className="text-xs text-zinc-500 dark:text-zinc-400">{formattedDate}</p>
+
+        {/* Reuse prompt button */}
+        <button
+          type="button"
+          onClick={onReusePrompt}
+          className="w-full py-2 px-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 font-medium text-sm rounded transition-colors"
+        >
+          プロンプトを再利用
+        </button>
 
         {/* Delete button */}
         <button

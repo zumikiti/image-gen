@@ -5,7 +5,13 @@ import { generateAction } from "@/app/actions";
 import { MODEL_CATALOG, DEFAULT_MODEL_ID, findModel } from "@/lib/models";
 import type { GenerationResult } from "@/lib/types";
 
-export function GenerationForm() {
+interface GenerationFormProps {
+  /** テキストエリアの値。ギャラリーの「プロンプトを再利用」から差し替えられる */
+  prompt: string;
+  onPromptChange: (value: string) => void;
+}
+
+export function GenerationForm({ prompt, onPromptChange }: GenerationFormProps) {
   const [state, formAction, isPending] = useActionState<
     GenerationResult | null,
     FormData
@@ -50,6 +56,8 @@ export function GenerationForm() {
           <textarea
             id="prompt"
             name="prompt"
+            value={prompt}
+            onChange={(e) => onPromptChange(e.target.value)}
             required
             placeholder="生成したい画像について説明してください..."
             rows={4}

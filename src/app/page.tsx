@@ -1,8 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { listImages } from "@/lib/db";
-import { GenerationForm } from "@/components/GenerationForm";
-import { Gallery } from "@/components/Gallery";
+import { GeneratorAndGallery } from "@/components/GeneratorAndGallery";
 import type { GeneratedImage } from "@/lib/types";
 
 export default async function Home() {
@@ -22,13 +21,7 @@ export default async function Home() {
           画像生成ギャラリー
         </h1>
 
-        <section className="mb-12">
-          <GenerationForm />
-        </section>
-
-        <section>
-          <Gallery images={images} />
-        </section>
+        <GeneratorAndGallery images={images} />
       </main>
     </div>
   );

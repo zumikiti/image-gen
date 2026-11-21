@@ -7,9 +7,11 @@ import { ImageModal } from "./ImageModal";
 
 interface GalleryProps {
   images: GeneratedImage[];
+  /** カードの「プロンプトを再利用」で、フォームの入力欄へ流し込む */
+  onReusePrompt: (prompt: string) => void;
 }
 
-export function Gallery({ images }: GalleryProps) {
+export function Gallery({ images, onReusePrompt }: GalleryProps) {
   const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
 
   if (images.length === 0) {
@@ -30,6 +32,7 @@ export function Gallery({ images }: GalleryProps) {
             key={image.id}
             image={image}
             onImageClick={() => setSelectedImage(image)}
+            onReusePrompt={() => onReusePrompt(image.prompt)}
           />
         ))}
       </div>
