@@ -40,6 +40,7 @@ export function ImageCard({
           onReusePrompt={onReusePrompt}
           onDelete={onDelete}
           isDeleting={isDeleting}
+          iconOnly
         />
       </div>
     </div>
