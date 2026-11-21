@@ -30,16 +30,21 @@ export function GeneratorAndGallery({ images }: GeneratorAndGalleryProps) {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const handleReusePrompt = (next: string) => {
+  /**
+   * 流し込んだら true、上書き確認で取り止めたら false。
+   * 呼び出し側(モーダル)は、適用できたときだけ閉じる。
+   */
+  const handleReusePrompt = (next: string): boolean => {
     // 入力済みの内容を黙って捨てない。上書きの可否を利用者に委ねる
     if (
       prompt.trim() !== "" &&
       !window.confirm("入力中のプロンプトを上書きしますか?")
     ) {
-      return;
+      return false;
     }
     setPrompt(next);
     setToast((prev) => ({ message: "プロンプトを再利用しました", seq: (prev?.seq ?? 0) + 1 }));
+    return true;
   };
 
   return (

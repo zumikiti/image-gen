@@ -1,14 +1,30 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GeneratedImage } from "@/lib/types";
+import { ImageActions } from "./ImageActions";
 
 interface ImageModalProps {
   image: GeneratedImage;
+  isDeleting?: boolean;
   onClose: () => void;
+  onReusePrompt: () => void;
+  onDelete: () => void;
 }
 
-export function ImageModal({ image, onClose }: ImageModalProps) {
+const PROMPT_CLAMP_CLASS = "line-clamp-3";
+
+export function ImageModal({
+  image,
+  isDeleting = false,
+  onClose,
+  onReusePrompt,
+  onDelete,
+}: ImageModalProps) {
+  const [isPromptExpanded, setIsPromptExpanded] = useState(false);
+  const [isPromptOverflowing, setIsPromptOverflowing] = useState(false);
+  const promptRef = useRef<HTMLParagraphElement>(null);
+
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -20,6 +36,13 @@ export function ImageModal({ image, onClose }: ImageModalProps) {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
+
+  // 3 行に収まらないときだけ「全文を表示」を出す。折りたたんだ高さで測る
+  useEffect(() => {
+    const el = promptRef.current;
+    if (!el || isPromptExpanded) return;
+    setIsPromptOverflowing(el.scrollHeight > el.clientHeight + 1);
+  }, [isPromptExpanded, image.prompt]);
 
   const formattedDate = new Date(image.createdAt).toLocaleString("ja-JP");
 
@@ -71,9 +94,23 @@ export function ImageModal({ image, onClose }: ImageModalProps) {
           {/* Prompt */}
           <div>
             <h3 className="text-sm font-medium text-foreground mb-2">プロンプト</h3>
-            <p className="text-foreground whitespace-pre-wrap bg-zinc-50 dark:bg-zinc-800 p-3 rounded">
+            <p
+              ref={promptRef}
+              className={`text-foreground whitespace-pre-wrap bg-zinc-50 dark:bg-zinc-800 p-3 rounded ${
+                isPromptExpanded ? "" : PROMPT_CLAMP_CLASS
+              }`}
+            >
               {image.prompt}
             </p>
+            {isPromptOverflowing && (
+              <button
+                type="button"
+                onClick={() => setIsPromptExpanded((expanded) => !expanded)}
+                className="mt-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {isPromptExpanded ? "折りたたむ" : "全文を表示"}
+              </button>
+            )}
           </div>
 
           {/* Metadata */}
@@ -103,6 +140,13 @@ export function ImageModal({ image, onClose }: ImageModalProps) {
               <p className="text-foreground font-medium text-sm">{formattedDate}</p>
             </div>
           </div>
+
+          {/* Actions (modal footer) */}
+          <ImageActions
+            onReusePrompt={onReusePrompt}
+            onDelete={onDelete}
+            isDeleting={isDeleting}
+          />
         </div>
       </div>
     </div>

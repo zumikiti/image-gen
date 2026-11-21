@@ -8,8 +8,8 @@ import { ImageModal } from "./ImageModal";
 
 interface GalleryProps {
   images: GeneratedImage[];
-  /** カードの「再利用」で、フォームの入力欄へ流し込む */
-  onReusePrompt: (prompt: string) => void;
+  /** カード/モーダルの「再利用」で、フォームの入力欄へ流し込む。適用したら true */
+  onReusePrompt: (prompt: string) => boolean;
 }
 
 export function Gallery({ images, onReusePrompt }: GalleryProps) {
@@ -33,6 +33,13 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
     });
   };
 
+  /** 上書き確認でキャンセルされた場合はモーダルを閉じない */
+  const handleReuse = (image: GeneratedImage, closeModal = false) => {
+    if (onReusePrompt(image.prompt) && closeModal) {
+      setSelectedImage(null);
+    }
+  };
+
   if (images.length === 0) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -52,7 +59,7 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
             image={image}
             isDeleting={deletingId === image.id}
             onImageClick={() => setSelectedImage(image)}
-            onReusePrompt={() => onReusePrompt(image.prompt)}
+            onReusePrompt={() => handleReuse(image)}
             onDelete={() => handleDelete(image)}
           />
         ))}
@@ -61,7 +68,10 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
       {selectedImage && (
         <ImageModal
           image={selectedImage}
+          isDeleting={deletingId === selectedImage.id}
           onClose={() => setSelectedImage(null)}
+          onReusePrompt={() => handleReuse(selectedImage, true)}
+          onDelete={() => handleDelete(selectedImage)}
         />
       )}
     </>
