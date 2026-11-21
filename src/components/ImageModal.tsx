@@ -3,6 +3,48 @@
 import { useEffect, useRef, useState } from "react";
 import type { GeneratedImage } from "@/lib/types";
 import { ImageActions } from "./ImageActions";
+import { DocumentDuplicateIcon } from "./icons";
+
+type CopyStatus = "idle" | "copied" | "failed";
+
+/**
+ * クリップボードへ書き込む。
+ * navigator.clipboard は secure context(https / localhost)でしか使えず、
+ * LAN の http で開いておると使えぬため、旧来の execCommand へ落とす。
+ */
+async function copyText(text: string): Promise<boolean> {
+  if (window.isSecureContext && navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // 権限拒否などはフォールバックへ回す
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "0";
+  textarea.style.left = "0";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+
+  let copied = false;
+  try {
+    textarea.focus();
+    textarea.select();
+    textarea.setSelectionRange(0, text.length);
+    copied = document.execCommand("copy");
+  } catch {
+    copied = false;
+  } finally {
+    document.body.removeChild(textarea);
+  }
+
+  return copied;
+}
 
 interface ImageModalProps {
   image: GeneratedImage;
@@ -23,6 +65,7 @@ export function ImageModal({
 }: ImageModalProps) {
   const [isPromptExpanded, setIsPromptExpanded] = useState(false);
   const [isPromptOverflowing, setIsPromptOverflowing] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
   const promptRef = useRef<HTMLParagraphElement>(null);
 
   // Close on Escape key
@@ -43,6 +86,18 @@ export function ImageModal({
     if (!el || isPromptExpanded) return;
     setIsPromptOverflowing(el.scrollHeight > el.clientHeight + 1);
   }, [isPromptExpanded, image.prompt]);
+
+  // 「コピーしました」はしばらくしたら戻す
+  useEffect(() => {
+    if (copyStatus === "idle") return;
+    const timer = setTimeout(() => setCopyStatus("idle"), 2000);
+    return () => clearTimeout(timer);
+  }, [copyStatus]);
+
+  const handleCopyPrompt = async () => {
+    const copied = await copyText(image.prompt);
+    setCopyStatus(copied ? "copied" : "failed");
+  };
 
   const formattedDate = new Date(image.createdAt).toLocaleString("ja-JP");
 
@@ -93,7 +148,24 @@ export function ImageModal({
 
           {/* Prompt */}
           <div>
-            <h3 className="text-sm font-medium text-foreground mb-2">プロンプト</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-foreground">プロンプト</h3>
+              <button
+                type="button"
+                onClick={handleCopyPrompt}
+                aria-label="プロンプトをコピー"
+                className="flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-foreground dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors"
+              >
+                <DocumentDuplicateIcon className="w-4 h-4 shrink-0" />
+                <span aria-live="polite">
+                  {copyStatus === "copied"
+                    ? "コピーしました"
+                    : copyStatus === "failed"
+                      ? "コピーできません"
+                      : "コピー"}
+                </span>
+              </button>
+            </div>
             <p
               ref={promptRef}
               className={`text-foreground whitespace-pre-wrap bg-zinc-50 dark:bg-zinc-800 p-3 rounded ${
