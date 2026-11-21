@@ -1,4 +1,4 @@
-import { QUALITIES, SIZES, type ModelDefinition } from "./types";
+import { QUALITIES, SIZES, STANDARD_SIZES, type ModelDefinition } from "./types";
 
 /**
  * モデルカタログ。モデルを増やすときはここに定義を足すだけでよい。
@@ -9,28 +9,28 @@ export const MODEL_CATALOG: readonly ModelDefinition[] = [
     id: "gpt-image-1-mini",
     label: "GPT Image 1 mini",
     priceHint: "安い(試し撃ち向け)",
-    sizes: SIZES,
+    sizes: STANDARD_SIZES,
     qualities: QUALITIES,
   },
   {
     id: "gpt-image-1",
     label: "GPT Image 1",
     priceHint: "標準",
-    sizes: SIZES,
+    sizes: STANDARD_SIZES,
     qualities: QUALITIES,
   },
   {
     id: "gpt-image-1.5",
     label: "GPT Image 1.5",
     priceHint: "やや高い",
-    sizes: SIZES,
+    sizes: STANDARD_SIZES,
     qualities: QUALITIES,
   },
   {
     id: "gpt-image-2",
     label: "GPT Image 2",
     priceHint: "高い(トークン消費大)",
-    sizes: SIZES,
+    sizes: STANDARD_SIZES,
     qualities: QUALITIES,
   },
   {
@@ -39,6 +39,7 @@ export const MODEL_CATALOG: readonly ModelDefinition[] = [
     provider: "mflux",
     priceHint: "無料(ローカル生成)",
     sizes: SIZES,
+    // 標準 3 種に加えて大判も選べる(ローカルは 4096 まで許される)
     qualities: QUALITIES,
   },
 ] as const;
