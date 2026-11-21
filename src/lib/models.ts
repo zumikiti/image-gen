@@ -43,7 +43,7 @@ export const MODEL_CATALOG: readonly ModelDefinition[] = [
   },
 ] as const;
 
-export const DEFAULT_MODEL_ID = "gpt-image-1-mini";
+export const DEFAULT_MODEL_ID = "mflux";
 
 export function findModel(id: string): ModelDefinition | undefined {
   return MODEL_CATALOG.find((m) => m.id === id);
