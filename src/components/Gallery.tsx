@@ -1,18 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { deleteAction } from "@/app/actions";
 import type { GeneratedImage } from "@/lib/types";
 import { ImageCard } from "./ImageCard";
 import { ImageModal } from "./ImageModal";
 
 interface GalleryProps {
   images: GeneratedImage[];
-  /** カードの「プロンプトを再利用」で、フォームの入力欄へ流し込む */
+  /** カードの「再利用」で、フォームの入力欄へ流し込む */
   onReusePrompt: (prompt: string) => void;
 }
 
 export function Gallery({ images, onReusePrompt }: GalleryProps) {
   const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  const handleDelete = (image: GeneratedImage) => {
+    const confirmed = window.confirm("この画像を削除しますか?");
+    if (!confirmed) return;
+
+    setDeletingId(image.id);
+    startTransition(async () => {
+      try {
+        await deleteAction(image.id);
+        // 削除した画像を開いたままにしない
+        setSelectedImage((current) => (current?.id === image.id ? null : current));
+      } finally {
+        setDeletingId(null);
+      }
+    });
+  };
 
   if (images.length === 0) {
     return (
@@ -26,13 +45,15 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {images.map((image) => (
           <ImageCard
             key={image.id}
             image={image}
+            isDeleting={deletingId === image.id}
             onImageClick={() => setSelectedImage(image)}
             onReusePrompt={() => onReusePrompt(image.prompt)}
+            onDelete={() => handleDelete(image)}
           />
         ))}
       </div>
