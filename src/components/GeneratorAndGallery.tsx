@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { GeneratedImage } from "@/lib/types";
+import type { ContextTemplate, GeneratedImage } from "@/lib/types";
 import { GenerationForm } from "./GenerationForm";
 import { Gallery } from "./Gallery";
 
 interface GeneratorAndGalleryProps {
   images: GeneratedImage[];
+  contexts: ContextTemplate[];
 }
 
 /** トーストを出しておく時間 */
@@ -20,7 +21,10 @@ type Toast = { message: string; seq: number };
  * 「プロンプトを再利用」はフォームの入力欄とギャラリーのカードの両方に跨るため、
  * テキストエリアの値をここで保持して双方に配る。
  */
-export function GeneratorAndGallery({ images }: GeneratorAndGalleryProps) {
+export function GeneratorAndGallery({
+  images,
+  contexts,
+}: GeneratorAndGalleryProps) {
   const [prompt, setPrompt] = useState("");
   const [toast, setToast] = useState<Toast | null>(null);
 
@@ -53,7 +57,11 @@ export function GeneratorAndGallery({ images }: GeneratorAndGalleryProps) {
   return (
     <>
       <section className="mb-12">
-        <GenerationForm prompt={prompt} onPromptChange={setPrompt} />
+        <GenerationForm
+          prompt={prompt}
+          onPromptChange={setPrompt}
+          contexts={contexts}
+        />
       </section>
 
       <section>
