@@ -43,15 +43,22 @@ function getDatabase(): Database.Database {
 export function insertImage(image: GeneratedImage): void {
   const db = getDatabase();
   const stmt = db.prepare(
-    "INSERT INTO images (id, prompt, model, size, quality, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    "INSERT INTO images (id, prompt, model, size, quality, created_at) VALUES (?, ?, ?, ?, ?, ?)",
   );
-  stmt.run(image.id, image.prompt, image.model, image.size, image.quality, image.createdAt);
+  stmt.run(
+    image.id,
+    image.prompt,
+    image.model,
+    image.size,
+    image.quality,
+    image.createdAt,
+  );
 }
 
 export function listImages(): GeneratedImage[] {
   const db = getDatabase();
   const stmt = db.prepare(
-    "SELECT id, prompt, model, size, quality, created_at FROM images ORDER BY created_at DESC"
+    "SELECT id, prompt, model, size, quality, created_at FROM images ORDER BY created_at DESC",
   );
   const rows = stmt.all() as Array<{
     id: string;
@@ -75,7 +82,7 @@ export function listImages(): GeneratedImage[] {
 export function getImage(id: string): GeneratedImage | undefined {
   const db = getDatabase();
   const stmt = db.prepare(
-    "SELECT id, prompt, model, size, quality, created_at FROM images WHERE id = ?"
+    "SELECT id, prompt, model, size, quality, created_at FROM images WHERE id = ?",
   );
   const row = stmt.get(id) as
     | {
@@ -107,4 +114,3 @@ export function deleteImage(id: string): void {
   const stmt = db.prepare("DELETE FROM images WHERE id = ?");
   stmt.run(id);
 }
-

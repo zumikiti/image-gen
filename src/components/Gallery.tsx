@@ -13,7 +13,9 @@ interface GalleryProps {
 }
 
 export function Gallery({ images, onReusePrompt }: GalleryProps) {
-  const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
+  const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(
+    null,
+  );
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -26,7 +28,9 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
       try {
         await deleteAction(image.id);
         // 削除した画像を開いたままにしない
-        setSelectedImage((current) => (current?.id === image.id ? null : current));
+        setSelectedImage((current) =>
+          current?.id === image.id ? null : current,
+        );
       } finally {
         setDeletingId(null);
       }

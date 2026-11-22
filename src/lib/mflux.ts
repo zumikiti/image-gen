@@ -13,7 +13,7 @@ function resolveEndpoint(): string {
   const baseUrl = process.env.MFLUX_BASE_URL;
   if (!baseUrl || baseUrl.trim() === "") {
     throw new Error(
-      "MFlux バックエンドが設定されていません。.env に MFLUX_BASE_URL を設定してください(例: http://<olmx起動PCのLAN IP>:8080/v1)"
+      "MFlux バックエンドが設定されていません。.env に MFLUX_BASE_URL を設定してください(例: http://<olmx起動PCのLAN IP>:8080/v1)",
     );
   }
   return baseUrl.replace(/\/+$/, "") + "/images/generations";
@@ -61,17 +61,17 @@ function postJson(endpoint: string, payload: unknown): Promise<RawResponse> {
             status: res.statusCode ?? 0,
             statusText: res.statusMessage ?? "",
             text: Buffer.concat(chunks).toString("utf8"),
-          })
+          }),
         );
         res.on("error", reject);
-      }
+      },
     );
 
     req.on("timeout", () => {
       req.destroy(
         new Error(
-          `MFlux サーバーの応答が ${GENERATION_TIMEOUT_MS / 60000} 分以内に返りませんでした`
-        )
+          `MFlux サーバーの応答が ${GENERATION_TIMEOUT_MS / 60000} 分以内に返りませんでした`,
+        ),
       );
     });
     req.on("error", reject);
@@ -93,7 +93,9 @@ function errorFromResponse(res: RawResponse): Error {
   return new Error(message);
 }
 
-async function toBuffer(data: Array<{ b64_json?: string; url?: string }>): Promise<Buffer> {
+async function toBuffer(
+  data: Array<{ b64_json?: string; url?: string }>,
+): Promise<Buffer> {
   const first = data[0];
   if (!first) {
     throw new Error("MFlux サーバーの応答に画像データが含まれていません");
@@ -106,7 +108,9 @@ async function toBuffer(data: Array<{ b64_json?: string; url?: string }>): Promi
   if (first.url) {
     const res = await fetch(first.url);
     if (!res.ok) {
-      throw new Error(`MFlux サーバーの画像ダウンロードに失敗しました: ${res.status}`);
+      throw new Error(
+        `MFlux サーバーの画像ダウンロードに失敗しました: ${res.status}`,
+      );
     }
     return Buffer.from(await res.arrayBuffer());
   }
@@ -114,7 +118,9 @@ async function toBuffer(data: Array<{ b64_json?: string; url?: string }>): Promi
   throw new Error("MFlux サーバーの応答に b64_json も url も含まれていません");
 }
 
-export async function generateWithMflux(input: GenerationInput): Promise<Buffer> {
+export async function generateWithMflux(
+  input: GenerationInput,
+): Promise<Buffer> {
   const endpoint = resolveEndpoint();
 
   const response = await postJson(endpoint, {

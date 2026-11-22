@@ -32,4 +32,3 @@ export function deleteImageFile(id: string): void {
     // no-op if file doesn't exist
   }
 }
-

@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { deleteImage, insertImage } from "@/lib/db";
 import { deleteImageFile, saveImageFile } from "@/lib/storage";
-import type { GeneratedImage, GenerationResult, Size, Quality } from "@/lib/types";
+import type {
+  GeneratedImage,
+  GenerationResult,
+  Size,
+  Quality,
+} from "@/lib/types";
 import { findModel } from "@/lib/models";
 import { generateImage } from "@/lib/generate";
 import { cleansePrompt } from "@/lib/openai";
@@ -49,16 +54,24 @@ export async function generateAction(
 
     // サイズ検証
     if (!modelDef.sizes.includes(size as Size)) {
-      return { ok: false, error: "選択されたサイズはこのモデルでは利用できません" };
+      return {
+        ok: false,
+        error: "選択されたサイズはこのモデルでは利用できません",
+      };
     }
 
     // 品質検証
     if (!modelDef.qualities.includes(quality as Quality)) {
-      return { ok: false, error: "選択された品質はこのモデルでは利用できません" };
+      return {
+        ok: false,
+        error: "選択された品質はこのモデルでは利用できません",
+      };
     }
 
     // 必要なら gpt-5.4 でプロンプトを練り直す。実際に画像生成へ渡す文面を記録する
-    const finalPrompt = cleanse ? await cleansePrompt(prompt.trim()) : prompt.trim();
+    const finalPrompt = cleanse
+      ? await cleansePrompt(prompt.trim())
+      : prompt.trim();
 
     // 画像生成
     const id = crypto.randomUUID();
@@ -102,4 +115,3 @@ export async function deleteAction(id: string): Promise<void> {
   deleteImageFile(id);
   revalidatePath("/");
 }
-
