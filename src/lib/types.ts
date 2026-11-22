@@ -49,3 +49,15 @@ export interface GenerationInput {
 
 export type GenerationResult =
   { ok: true; image: GeneratedImage } | { ok: false; error: string };
+
+/**
+ * プロンプト調整に添えるベースコンテキスト(AGENTS.md / SKILL.md 的なテンプレート)。
+ * 管理画面(/admin)で一覧・新規・編集・削除できる。
+ */
+export interface ContextTemplate {
+  id: string;
+  name: string;
+  content: string;
+  /** ISO 8601 */
+  createdAt: string;
+}

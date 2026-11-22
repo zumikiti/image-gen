@@ -1,7 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { deleteImage, insertImage } from "@/lib/db";
+import {
+  deleteContextTemplate,
+  deleteImage,
+  getContextTemplate,
+  insertContextTemplate,
+  insertImage,
+  updateContextTemplate,
+} from "@/lib/db";
 import { deleteImageFile, saveImageFile } from "@/lib/storage";
 import type {
   GeneratedImage,
@@ -11,7 +18,9 @@ import type {
 } from "@/lib/types";
 import { findModel } from "@/lib/models";
 import { generateImage } from "@/lib/generate";
-import { cleansePrompt } from "@/lib/openai";
+import { cleansePrompt } from "@/lib/cleanse";
+
+type ContextSaveResult = { ok: true } | { ok: false; error: string };
 
 /**
  * 画像生成フォームから呼ばれるサーバーアクション。
@@ -28,6 +37,7 @@ export async function generateAction(
     const size = formData.get("size");
     const quality = formData.get("quality");
     const cleanse = formData.get("cleanse") === "on";
+    const contextId = formData.get("context");
 
     // 型チェックと値の確認
     if (typeof prompt !== "string" || !prompt.trim()) {
@@ -68,9 +78,15 @@ export async function generateAction(
       };
     }
 
-    // 必要なら gpt-5.4 でプロンプトを練り直す。実際に画像生成へ渡す文面を記録する
+    // 必要ならローカル LLM でプロンプトを練り直す。コンテキストがあれば添える。
+    // 実際に画像生成へ渡す文面を記録する(= レスポンスの内容)。
+    const context =
+      typeof contextId === "string" && contextId.trim() !== ""
+        ? getContextTemplate(contextId.trim())?.content
+        : undefined;
+
     const finalPrompt = cleanse
-      ? await cleansePrompt(prompt.trim())
+      ? await cleansePrompt(prompt.trim(), context)
       : prompt.trim();
 
     // 画像生成
@@ -113,5 +129,42 @@ export async function generateAction(
 export async function deleteAction(id: string): Promise<void> {
   deleteImage(id);
   deleteImageFile(id);
+  revalidatePath("/");
+}
+
+/**
+ * コンテキスト設定の新規登録・更新用サーバーアクション(管理画面から呼ばれる)。
+ * formData に id があれば更新、なければ新規作成する。
+ */
+export async function saveContextAction(
+  _prevState: ContextSaveResult | null,
+  formData: FormData,
+): Promise<ContextSaveResult> {
+  const id = formData.get("id");
+  const name = formData.get("name");
+  const content = formData.get("content");
+
+  if (typeof name !== "string" || !name.trim()) {
+    return { ok: false, error: "名前は空にできません" };
+  }
+  if (typeof content !== "string" || !content.trim()) {
+    return { ok: false, error: "本文は空にできません" };
+  }
+
+  if (typeof id === "string" && id.trim() !== "") {
+    updateContextTemplate(id.trim(), name.trim(), content.trim());
+  } else {
+    insertContextTemplate(name.trim(), content.trim());
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** コンテキスト設定の削除用サーバーアクション */
+export async function deleteContextAction(id: string): Promise<void> {
+  deleteContextTemplate(id);
+  revalidatePath("/admin");
   revalidatePath("/");
 }

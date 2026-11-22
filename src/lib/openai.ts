@@ -5,9 +5,6 @@ import type { GenerationInput } from "./types";
  * このモジュールは OpenAI 専用。バックエンドの振り分けは lib/generate.ts が担当する。
  */
 
-/** プロンプトクレンジングに使う言語モデル */
-const CLEANSE_MODEL = "gpt-5.4";
-
 function requireApiKey(): string {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey || apiKey.trim() === "") {
@@ -67,53 +64,4 @@ export async function generateWithOpenAi(
   }
 
   return Buffer.from(b64_json, "base64");
-}
-
-const CLEANSE_SYSTEM_PROMPT = [
-  "あなたは画像生成モデル向けのプロンプトを整える専門家です。",
-  "ユーザーが入力した画像の説明を、画像生成モデルがより正確で高品質な画像を作れるように書き直してください。",
-  "被写体・構図・画風・色・光・背景・雰囲気などの具体的な描写を補い、曖昧さを取り除きます。",
-  "ユーザーの元の意図を絶対に変えず、勝手に新しい題材を足さないこと。入力と同じ言語で書くこと。",
-  "出力は書き直したプロンプト本文のみ。前置き・解説・引用符・箇条書きは一切付けないこと。",
-].join("\n");
-
-/**
- * gpt-5.4 にユーザーのプロンプトを渡し、画像生成向けに練り直した文面を返す。
- */
-export async function cleansePrompt(userPrompt: string): Promise<string> {
-  const apiKey = requireApiKey();
-
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: CLEANSE_MODEL,
-      messages: [
-        { role: "system", content: CLEANSE_SYSTEM_PROMPT },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 800,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `プロンプト調整に失敗しました: ${await extractErrorMessage(response)}`,
-    );
-  }
-
-  const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-
-  const cleansed = data.choices?.[0]?.message?.content?.trim();
-  if (!cleansed) {
-    throw new Error("プロンプト調整の応答が空でした");
-  }
-
-  return cleansed;
 }
