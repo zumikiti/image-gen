@@ -1,14 +1,92 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GeneratedImage } from "@/lib/types";
+import { ImageActions } from "./ImageActions";
+import { DocumentDuplicateIcon } from "./icons";
+
+type CopyStatus = "idle" | "copied" | "failed";
+
+/**
+ * クリップボードへ書き込む。
+ * navigator.clipboard は secure context(https / localhost)でしか使えず、
+ * LAN の http で開いておると使えぬため、旧来の execCommand へ落とす。
+ */
+async function copyText(text: string): Promise<boolean> {
+  if (window.isSecureContext && navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // 権限拒否などはフォールバックへ回す
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "0";
+  textarea.style.left = "0";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+
+  let copied = false;
+  try {
+    textarea.focus();
+    textarea.select();
+    textarea.setSelectionRange(0, text.length);
+    copied = document.execCommand("copy");
+  } catch {
+    copied = false;
+  } finally {
+    document.body.removeChild(textarea);
+  }
+
+  return copied;
+}
 
 interface ImageModalProps {
   image: GeneratedImage;
+  isDeleting?: boolean;
   onClose: () => void;
+  onReusePrompt: () => void;
+  onDelete: () => void;
 }
 
-export function ImageModal({ image, onClose }: ImageModalProps) {
+const PROMPT_CLAMP_CLASS = "line-clamp-3";
+
+export function ImageModal({
+  image,
+  isDeleting = false,
+  onClose,
+  onReusePrompt,
+  onDelete,
+}: ImageModalProps) {
+  const [isPromptExpanded, setIsPromptExpanded] = useState(false);
+  const [isPromptOverflowing, setIsPromptOverflowing] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
+  const promptRef = useRef<HTMLParagraphElement>(null);
+
+  // 開いておる間は背後のページをスクロールさせない。
+  // スクロールバーが消えるぶんの横ずれは padding で埋める
+  useEffect(() => {
+    const { body } = document;
+    const previousOverflow = body.style.overflow;
+    const previousPaddingRight = body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+
+    body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    return () => {
+      body.style.overflow = previousOverflow;
+      body.style.paddingRight = previousPaddingRight;
+    };
+  }, []);
+
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -20,6 +98,25 @@ export function ImageModal({ image, onClose }: ImageModalProps) {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
+
+  // 3 行に収まらないときだけ「全文を表示」を出す。折りたたんだ高さで測る
+  useEffect(() => {
+    const el = promptRef.current;
+    if (!el || isPromptExpanded) return;
+    setIsPromptOverflowing(el.scrollHeight > el.clientHeight + 1);
+  }, [isPromptExpanded, image.prompt]);
+
+  // 「コピーしました」はしばらくしたら戻す
+  useEffect(() => {
+    if (copyStatus === "idle") return;
+    const timer = setTimeout(() => setCopyStatus("idle"), 2000);
+    return () => clearTimeout(timer);
+  }, [copyStatus]);
+
+  const handleCopyPrompt = async () => {
+    const copied = await copyText(image.prompt);
+    setCopyStatus(copied ? "copied" : "failed");
+  };
 
   const formattedDate = new Date(image.createdAt).toLocaleString("ja-JP");
 
@@ -70,10 +167,41 @@ export function ImageModal({ image, onClose }: ImageModalProps) {
 
           {/* Prompt */}
           <div>
-            <h3 className="text-sm font-medium text-foreground mb-2">プロンプト</h3>
-            <p className="text-foreground whitespace-pre-wrap bg-zinc-50 dark:bg-zinc-800 p-3 rounded">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-foreground">プロンプト</h3>
+              <button
+                type="button"
+                onClick={handleCopyPrompt}
+                aria-label="プロンプトをコピー"
+                className="flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-foreground dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors"
+              >
+                <DocumentDuplicateIcon className="w-4 h-4 shrink-0" />
+                <span aria-live="polite">
+                  {copyStatus === "copied"
+                    ? "コピーしました"
+                    : copyStatus === "failed"
+                      ? "コピーできません"
+                      : "コピー"}
+                </span>
+              </button>
+            </div>
+            <p
+              ref={promptRef}
+              className={`text-foreground whitespace-pre-wrap bg-zinc-50 dark:bg-zinc-800 p-3 rounded ${
+                isPromptExpanded ? "" : PROMPT_CLAMP_CLASS
+              }`}
+            >
               {image.prompt}
             </p>
+            {isPromptOverflowing && (
+              <button
+                type="button"
+                onClick={() => setIsPromptExpanded((expanded) => !expanded)}
+                className="mt-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {isPromptExpanded ? "折りたたむ" : "全文を表示"}
+              </button>
+            )}
           </div>
 
           {/* Metadata */}
@@ -103,6 +231,13 @@ export function ImageModal({ image, onClose }: ImageModalProps) {
               <p className="text-foreground font-medium text-sm">{formattedDate}</p>
             </div>
           </div>
+
+          {/* Actions (modal footer) */}
+          <ImageActions
+            onReusePrompt={onReusePrompt}
+            onDelete={onDelete}
+            isDeleting={isDeleting}
+          />
         </div>
       </div>
     </div>

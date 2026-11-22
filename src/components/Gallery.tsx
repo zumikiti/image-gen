@@ -1,16 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { deleteAction } from "@/app/actions";
 import type { GeneratedImage } from "@/lib/types";
 import { ImageCard } from "./ImageCard";
 import { ImageModal } from "./ImageModal";
 
 interface GalleryProps {
   images: GeneratedImage[];
+  /** カード/モーダルの「再利用」で、フォームの入力欄へ流し込む。適用したら true */
+  onReusePrompt: (prompt: string) => boolean;
 }
 
-export function Gallery({ images }: GalleryProps) {
+export function Gallery({ images, onReusePrompt }: GalleryProps) {
   const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  const handleDelete = (image: GeneratedImage) => {
+    const confirmed = window.confirm("この画像を削除しますか?");
+    if (!confirmed) return;
+
+    setDeletingId(image.id);
+    startTransition(async () => {
+      try {
+        await deleteAction(image.id);
+        // 削除した画像を開いたままにしない
+        setSelectedImage((current) => (current?.id === image.id ? null : current));
+      } finally {
+        setDeletingId(null);
+      }
+    });
+  };
+
+  /** 上書き確認でキャンセルされた場合はモーダルを閉じない */
+  const handleReuse = (image: GeneratedImage, closeModal = false) => {
+    if (onReusePrompt(image.prompt) && closeModal) {
+      setSelectedImage(null);
+    }
+  };
 
   if (images.length === 0) {
     return (
@@ -24,12 +52,15 @@ export function Gallery({ images }: GalleryProps) {
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {images.map((image) => (
           <ImageCard
             key={image.id}
             image={image}
+            isDeleting={deletingId === image.id}
             onImageClick={() => setSelectedImage(image)}
+            onReusePrompt={() => handleReuse(image)}
+            onDelete={() => handleDelete(image)}
           />
         ))}
       </div>
@@ -37,7 +68,10 @@ export function Gallery({ images }: GalleryProps) {
       {selectedImage && (
         <ImageModal
           image={selectedImage}
+          isDeleting={deletingId === selectedImage.id}
           onClose={() => setSelectedImage(null)}
+          onReusePrompt={() => handleReuse(selectedImage, true)}
+          onDelete={() => handleDelete(selectedImage)}
         />
       )}
     </>

@@ -16,8 +16,8 @@ function requireApiKey(): string {
   return apiKey;
 }
 
-/** エラーレスポンスの message を取り出す。mflux クライアントも OpenAI 互換のエラー形式を想定して再利用する */
-export async function extractErrorMessage(response: Response): Promise<string> {
+/** エラーレスポンスの message を取り出す */
+async function extractErrorMessage(response: Response): Promise<string> {
   let message = response.statusText;
   try {
     const body = (await response.json()) as { error?: { message?: string } };
