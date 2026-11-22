@@ -1,4 +1,9 @@
-import { QUALITIES, SIZES, STANDARD_SIZES, type ModelDefinition } from "./types";
+import {
+  QUALITIES,
+  SIZES,
+  STANDARD_SIZES,
+  type ModelDefinition,
+} from "./types";
 
 /**
  * モデルカタログ。モデルを増やすときはここに定義を足すだけでよい。

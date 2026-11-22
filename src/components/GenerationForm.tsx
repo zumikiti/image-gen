@@ -11,7 +11,10 @@ interface GenerationFormProps {
   onPromptChange: (value: string) => void;
 }
 
-export function GenerationForm({ prompt, onPromptChange }: GenerationFormProps) {
+export function GenerationForm({
+  prompt,
+  onPromptChange,
+}: GenerationFormProps) {
   const [state, formAction, isPending] = useActionState<
     GenerationResult | null,
     FormData
@@ -20,10 +23,10 @@ export function GenerationForm({ prompt, onPromptChange }: GenerationFormProps) 
   const [selectedModelId, setSelectedModelId] = useState(DEFAULT_MODEL_ID);
   const defaultModel = findModel(DEFAULT_MODEL_ID);
   const [selectedSize, setSelectedSize] = useState<string>(
-    defaultModel?.sizes[0] ?? ""
+    defaultModel?.sizes[0] ?? "",
   );
   const [selectedQuality, setSelectedQuality] = useState<string>(
-    defaultModel?.qualities[0] ?? ""
+    defaultModel?.qualities[0] ?? "",
   );
 
   const currentModel = findModel(selectedModelId);
@@ -226,7 +229,9 @@ export function GenerationForm({ prompt, onPromptChange }: GenerationFormProps) 
         {/* Error message */}
         {state && !state.ok && (
           <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-            <p className="text-red-700 dark:text-red-400 text-sm">{state.error}</p>
+            <p className="text-red-700 dark:text-red-400 text-sm">
+              {state.error}
+            </p>
           </div>
         )}
       </form>

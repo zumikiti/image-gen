@@ -11,7 +11,9 @@ const CLEANSE_MODEL = "gpt-5.4";
 function requireApiKey(): string {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey || apiKey.trim() === "") {
-    throw new Error("OPENAI_API_KEY が設定されておりません。.env に設定してください");
+    throw new Error(
+      "OPENAI_API_KEY が設定されておりません。.env に設定してください",
+    );
   }
   return apiKey;
 }
@@ -31,7 +33,9 @@ async function extractErrorMessage(response: Response): Promise<string> {
 }
 
 /** OpenAI Images API を呼び、1 枚の画像(Buffer)を返す */
-export async function generateWithOpenAi(input: GenerationInput): Promise<Buffer> {
+export async function generateWithOpenAi(
+  input: GenerationInput,
+): Promise<Buffer> {
   const apiKey = requireApiKey();
 
   const response = await fetch("https://api.openai.com/v1/images/generations", {
@@ -53,7 +57,9 @@ export async function generateWithOpenAi(input: GenerationInput): Promise<Buffer
     throw new Error(await extractErrorMessage(response));
   }
 
-  const data = (await response.json()) as { data?: Array<{ b64_json?: string }> };
+  const data = (await response.json()) as {
+    data?: Array<{ b64_json?: string }>;
+  };
 
   const b64_json = data.data?.[0]?.b64_json;
   if (!b64_json) {
@@ -95,7 +101,9 @@ export async function cleansePrompt(userPrompt: string): Promise<string> {
   });
 
   if (!response.ok) {
-    throw new Error(`プロンプト調整に失敗しました: ${await extractErrorMessage(response)}`);
+    throw new Error(
+      `プロンプト調整に失敗しました: ${await extractErrorMessage(response)}`,
+    );
   }
 
   const data = (await response.json()) as {

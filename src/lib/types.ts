@@ -48,5 +48,4 @@ export interface GenerationInput {
 }
 
 export type GenerationResult =
-  | { ok: true; image: GeneratedImage }
-  | { ok: false; error: string };
+  { ok: true; image: GeneratedImage } | { ok: false; error: string };

@@ -43,7 +43,10 @@ export function GeneratorAndGallery({ images }: GeneratorAndGalleryProps) {
       return false;
     }
     setPrompt(next);
-    setToast((prev) => ({ message: "プロンプトを再利用しました", seq: (prev?.seq ?? 0) + 1 }));
+    setToast((prev) => ({
+      message: "プロンプトを再利用しました",
+      seq: (prev?.seq ?? 0) + 1,
+    }));
     return true;
   };
 

@@ -74,7 +74,8 @@ export function ImageModal({
     const { body } = document;
     const previousOverflow = body.style.overflow;
     const previousPaddingRight = body.style.paddingRight;
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    const scrollbarWidth =
+      window.innerWidth - document.documentElement.clientWidth;
 
     body.style.overflow = "hidden";
     if (scrollbarWidth > 0) {
@@ -168,7 +169,9 @@ export function ImageModal({
           {/* Prompt */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-foreground">プロンプト</h3>
+              <h3 className="text-sm font-medium text-foreground">
+                プロンプト
+              </h3>
               <button
                 type="button"
                 onClick={handleCopyPrompt}
@@ -228,7 +231,9 @@ export function ImageModal({
               <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
                 作成日時
               </p>
-              <p className="text-foreground font-medium text-sm">{formattedDate}</p>
+              <p className="text-foreground font-medium text-sm">
+                {formattedDate}
+              </p>
             </div>
           </div>
 
