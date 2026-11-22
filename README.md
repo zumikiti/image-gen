@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# image-gen
 
-## Getting Started
+OpenAI の画像生成 API、または手元の Mac で動かす **mflux**（OpenAI 互換サーバー）で画像を 1 枚ずつ生成し、ローカルに貯めて一覧で眺める個人用ツールである。localhost で単一ユーザーが使う前提で作ってある。
 
-First, run the development server:
+## できること
+
+- プロンプトから画像を 1 枚生成（既定のモデルはローカルの mflux）
+- 生成結果を SQLite と PNG ファイルに保存し、ギャラリーに新しい順で並べる
+- カードから**プロンプトの再利用**、モーダルで**全文表示・コピー・削除**
+- モデル・サイズ・品質はカタログで宣言する（追加は定義 1 つ。用語は [CONTEXT.md](./CONTEXT.md) を参照）
+
+## 必要環境
+
+- Node.js **20.9 以上**（Next.js 16 の要件）
+- `better-sqlite3` が動く環境（主要プラットフォームは prebuilt で入る）
+
+## セットアップ
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env   # 値を埋める
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`.env` の項目:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| 変数 | 用途 |
+|---|---|
+| `OPENAI_API_KEY` | OpenAI 系モデルの生成、および「gpt-5.4 でプロンプトを調整」に必要 |
+| `MFLUX_BASE_URL` | ローカル mflux の OpenAI 互換端点（例: `http://<Mac の LAN IP>:8420/v1`） |
+| `MFLUX_MODEL` | サーバー側のモデル名。起動中の `/health` の `model.name` と一致させる |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`MFLUX_MODEL` は省略可に見えるが、**実質必須**である。未設定だとカタログ ID `mflux` をそのまま送るため、モデル名を検証するサーバーでは 400 になる。
 
-## Learn More
+## ローカル生成（mflux）
 
-To learn more about Next.js, take a look at the following resources:
+mflux 本体にはサーバーが無い。LAN の Mac で **OpenAI 互換の HTTP サーバー**を起こし、その URL を `MFLUX_BASE_URL` に指す。以下は [mfluxible](https://github.com/wesbiggs/mfluxible) を使う例である。
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+pip install 'mfluxible==0.9.3'
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+MFLUXIBLE_MODEL=z-image-turbo \
+MFLUXIBLE_QUANTIZE=4 \
+mfluxible-server --host 0.0.0.0 --port 8420
+```
 
-## Deploy on Vercel
+- `--host` を省くと `127.0.0.1` にしか縛られぬ。LAN の他端末から使うなら `0.0.0.0` を明示する
+- 起動後に `curl http://<host>:8420/health` で `model.name` を確かめ、`.env` の `MFLUX_MODEL` を合わせる
+- 初回起動は重みの取得と量子化で長い。大判（2048 系）は RAM と時間を食い、アプリ側は 20 分で打ち切る
+- 品質（`quality`）は mflux の互換端点では無視される（OpenAI 系では有効）
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 起動
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+# 開発
+npm run dev
+
+# 本番
+npm run build
+npm start -- -H 0.0.0.0 -p 3000
+```
+
+`next dev` は既定で `0.0.0.0` に待つが、**LAN の IP で開くには** `next.config.ts` の `allowedDevOrigins` にそのホストを足す必要がある（Next.js 16 は開発中のクロスオリジン要求を遮断するため）。本番（`next start`）では不要である。
+
+## データ
+
+- `data/app.db`（SQLite）と `data/images/<id>.png` に保存する。どちらも `.gitignore` 済みである
+- バックアップするならこの `data/` ごと控えること。消せば失われる
+
+## 心得
+
+- 認証は無い。信頼できる LAN に留め、外部へ晒さぬこと
+- 開発の作法は [AGENTS.md](./AGENTS.md)、語彙は [CONTEXT.md](./CONTEXT.md) にある
+- `npm run lint` で静的検査
