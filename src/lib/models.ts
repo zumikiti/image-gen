@@ -33,6 +33,14 @@ export const MODEL_CATALOG: readonly ModelDefinition[] = [
     sizes: SIZES,
     qualities: QUALITIES,
   },
+  {
+    id: "mflux",
+    label: "MFlux(ローカル)",
+    provider: "mflux",
+    priceHint: "無料(ローカル生成)",
+    sizes: SIZES,
+    qualities: QUALITIES,
+  },
 ] as const;
 
 export const DEFAULT_MODEL_ID = "gpt-image-1-mini";

@@ -2,6 +2,7 @@ import type { GenerationInput } from "./types";
 
 /**
  * OpenAI API クライアント。API キーは環境変数 OPENAI_API_KEY から読む。
+ * このモジュールは OpenAI 専用。バックエンドの振り分けは lib/generate.ts が担当する。
  */
 
 /** プロンプトクレンジングに使う言語モデル */
@@ -15,7 +16,8 @@ function requireApiKey(): string {
   return apiKey;
 }
 
-async function extractErrorMessage(response: Response): Promise<string> {
+/** エラーレスポンスの message を取り出す。mflux クライアントも OpenAI 互換のエラー形式を想定して再利用する */
+export async function extractErrorMessage(response: Response): Promise<string> {
   let message = response.statusText;
   try {
     const body = (await response.json()) as { error?: { message?: string } };
@@ -28,7 +30,8 @@ async function extractErrorMessage(response: Response): Promise<string> {
   return message;
 }
 
-export async function generateImage(input: GenerationInput): Promise<Buffer> {
+/** OpenAI Images API を呼び、1 枚の画像(Buffer)を返す */
+export async function generateWithOpenAi(input: GenerationInput): Promise<Buffer> {
   const apiKey = requireApiKey();
 
   const response = await fetch("https://api.openai.com/v1/images/generations", {
