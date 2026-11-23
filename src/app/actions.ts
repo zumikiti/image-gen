@@ -1,7 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { deleteImage, insertImage } from "@/lib/db";
+import {
+  deleteContextTemplate,
+  deleteImage,
+  getContextTemplate,
+  insertContextTemplate,
+  insertImage,
+  updateContextTemplate,
+} from "@/lib/db";
 import { deleteImageFile, saveImageFile } from "@/lib/storage";
 import type {
   GeneratedImage,
@@ -11,7 +18,11 @@ import type {
 } from "@/lib/types";
 import { findModel } from "@/lib/models";
 import { generateImage } from "@/lib/generate";
-import { cleansePrompt } from "@/lib/openai";
+import { cleansePrompt } from "@/lib/cleanse";
+
+type ContextSaveResult = { ok: true } | { ok: false; error: string };
+type CleanseResult =
+  { ok: true; prompt: string } | { ok: false; error: string };
 
 /**
  * 画像生成フォームから呼ばれるサーバーアクション。
@@ -27,7 +38,6 @@ export async function generateAction(
     const model = formData.get("model");
     const size = formData.get("size");
     const quality = formData.get("quality");
-    const cleanse = formData.get("cleanse") === "on";
 
     // 型チェックと値の確認
     if (typeof prompt !== "string" || !prompt.trim()) {
@@ -68,10 +78,8 @@ export async function generateAction(
       };
     }
 
-    // 必要なら gpt-5.4 でプロンプトを練り直す。実際に画像生成へ渡す文面を記録する
-    const finalPrompt = cleanse
-      ? await cleansePrompt(prompt.trim())
-      : prompt.trim();
+    // 調整は cleanseAction が済ませている。ここは渡された文面をそのまま生成に使う。
+    const finalPrompt = prompt.trim();
 
     // 画像生成
     const id = crypto.randomUUID();
@@ -107,11 +115,72 @@ export async function generateAction(
 }
 
 /**
+ * プロンプト調整用サーバーアクション。画像生成とは分け、クライアントが
+ * 「調整中」「生成中」を区別して表示できるようにする。画像は生成せず、
+ * 練り直した文面だけを返す。contextId があればその本文を添える。
+ */
+export async function cleanseAction(
+  rawPrompt: string,
+  contextId: string,
+): Promise<CleanseResult> {
+  if (!rawPrompt.trim()) {
+    return { ok: false, error: "プロンプトは空にできません" };
+  }
+  try {
+    const context =
+      contextId.trim() !== ""
+        ? getContextTemplate(contextId.trim())?.content
+        : undefined;
+    const prompt = await cleansePrompt(rawPrompt.trim(), context);
+    return { ok: true, prompt };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
  * 画像削除用サーバーアクション。
  * DB と ストレージの両方から削除してからリバリデートする。
  */
 export async function deleteAction(id: string): Promise<void> {
   deleteImage(id);
   deleteImageFile(id);
+  revalidatePath("/");
+}
+
+/**
+ * コンテキスト設定の新規登録・更新用サーバーアクション(管理画面から呼ばれる)。
+ * formData に id があれば更新、なければ新規作成する。
+ */
+export async function saveContextAction(
+  _prevState: ContextSaveResult | null,
+  formData: FormData,
+): Promise<ContextSaveResult> {
+  const id = formData.get("id");
+  const name = formData.get("name");
+  const content = formData.get("content");
+
+  if (typeof name !== "string" || !name.trim()) {
+    return { ok: false, error: "名前は空にできません" };
+  }
+  if (typeof content !== "string" || !content.trim()) {
+    return { ok: false, error: "本文は空にできません" };
+  }
+
+  if (typeof id === "string" && id.trim() !== "") {
+    updateContextTemplate(id.trim(), name.trim(), content.trim());
+  } else {
+    insertContextTemplate(name.trim(), content.trim());
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** コンテキスト設定の削除用サーバーアクション */
+export async function deleteContextAction(id: string): Promise<void> {
+  deleteContextTemplate(id);
+  revalidatePath("/admin");
   revalidatePath("/");
 }

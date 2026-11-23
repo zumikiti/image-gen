@@ -1,24 +1,31 @@
 "use client";
 
-import { useActionState, useState, useEffect, useRef } from "react";
-import { generateAction } from "@/app/actions";
+import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import { cleanseAction, generateAction } from "@/app/actions";
 import { MODEL_CATALOG, DEFAULT_MODEL_ID, findModel } from "@/lib/models";
-import type { GenerationResult } from "@/lib/types";
+import type { ContextTemplate, GenerationResult } from "@/lib/types";
 
 interface GenerationFormProps {
   /** テキストエリアの値。ギャラリーの「プロンプトを再利用」から差し替えられる */
   prompt: string;
   onPromptChange: (value: string) => void;
+  /** プロンプト調整に添えるコンテキスト(管理画面 /admin で管理) */
+  contexts: ContextTemplate[];
 }
 
 export function GenerationForm({
   prompt,
   onPromptChange,
+  contexts,
 }: GenerationFormProps) {
-  const [state, formAction, isPending] = useActionState<
-    GenerationResult | null,
-    FormData
-  >(generateAction, null);
+  const [selectedContextId, setSelectedContextId] = useState("");
+  // 調整(cleanse)と生成を別アクションに分けたので、どちらを実行中かを保持する
+  const [phase, setPhase] = useState<"idle" | "cleansing" | "generating">(
+    "idle",
+  );
+  const [state, setState] = useState<GenerationResult | null>(null);
+  const isPending = phase !== "idle";
 
   const [selectedModelId, setSelectedModelId] = useState(DEFAULT_MODEL_ID);
   const defaultModel = findModel(DEFAULT_MODEL_ID);
@@ -63,6 +70,44 @@ export function GenerationForm({
     setSelectedModelId(e.target.value);
   };
 
+  // 調整が要るなら cleanseAction を先に呼び、その文面を generateAction へ渡す。
+  // 調整に失敗したら生成へ進まず、エラーだけ見せる。
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (isPending) return;
+
+    const formData = new FormData(e.currentTarget);
+    let promptText = String(formData.get("prompt") ?? "").trim();
+
+    if (formData.get("cleanse") === "on") {
+      setPhase("cleansing");
+      const cleansed = await cleanseAction(
+        promptText,
+        String(formData.get("context") ?? ""),
+      );
+      if (!cleansed.ok) {
+        setState({ ok: false, error: cleansed.error });
+        setPhase("idle");
+        return;
+      }
+      promptText = cleansed.prompt;
+      // 生成には調整後の文面を渡す(テキストエリアは書き戻さない)
+      formData.set("prompt", promptText);
+    }
+
+    setPhase("generating");
+    try {
+      setState(await generateAction(null, formData));
+    } catch (err) {
+      setState({
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setPhase("idle");
+    }
+  };
+
   // Ctrl/Cmd + Enter で送信。Enter 単独は改行のままにする
   const handlePromptKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (!(e.metaKey || e.ctrlKey) || e.key !== "Enter" || isPending) return;
@@ -72,7 +117,7 @@ export function GenerationForm({
 
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg shadow p-4 border border-zinc-200 dark:border-zinc-800">
-      <form action={formAction} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-3">
         {/* 常時表示: プロンプト / サイズ / 生成 */}
         <div className="flex flex-col sm:flex-row gap-3 sm:items-start">
           <div className="flex-1">
@@ -142,7 +187,7 @@ export function GenerationForm({
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  生成中…
+                  {phase === "cleansing" ? "プロンプト調整中…" : "画像生成中…"}
                 </>
               ) : (
                 "生成する"
@@ -206,6 +251,39 @@ export function GenerationForm({
               </div>
             </div>
 
+            <div>
+              <label
+                htmlFor="context"
+                className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1"
+              >
+                コンテキスト
+              </label>
+              <select
+                id="context"
+                name="context"
+                value={selectedContextId}
+                onChange={(e) => setSelectedContextId(e.target.value)}
+                disabled={isPending}
+                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50"
+              >
+                <option value="">なし</option>
+                {contexts.map((context) => (
+                  <option key={context.id} value={context.id}>
+                    {context.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
+                プロンプト調整に添えるベースコンテキスト。
+                <Link
+                  href="/admin"
+                  className="text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  設定画面で管理
+                </Link>
+              </p>
+            </div>
+
             <div className="flex items-start gap-3">
               <input
                 type="checkbox"
@@ -216,10 +294,10 @@ export function GenerationForm({
               />
               <label htmlFor="cleanse" className="text-sm text-foreground">
                 <span className="font-medium">
-                  gpt-5.4 でプロンプトを調整してから生成
+                  ローカルLLMでプロンプトを調整してから生成
                 </span>
                 <span className="block text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  入力を画像生成向けに書き直してから渡します(生成時間と料金が少し増えます)
+                  入力を画像生成向けに書き直してから渡します(生成時間が少し増えます)
                 </span>
               </label>
             </div>

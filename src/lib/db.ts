@@ -1,4 +1,4 @@
-import type { GeneratedImage } from "./types";
+import type { ContextTemplate, GeneratedImage } from "./types";
 import Database from "better-sqlite3";
 import * as fs from "fs";
 import * as path from "path";
@@ -32,6 +32,14 @@ function getDatabase(): Database.Database {
       model TEXT NOT NULL,
       size TEXT NOT NULL,
       quality TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS context_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      content TEXT NOT NULL,
       created_at TEXT NOT NULL
     )
   `);
@@ -112,5 +120,85 @@ export function getImage(id: string): GeneratedImage | undefined {
 export function deleteImage(id: string): void {
   const db = getDatabase();
   const stmt = db.prepare("DELETE FROM images WHERE id = ?");
+  stmt.run(id);
+}
+
+function mapContextRow(row: {
+  id: string;
+  name: string;
+  content: string;
+  created_at: string;
+}): ContextTemplate {
+  return {
+    id: row.id,
+    name: row.name,
+    content: row.content,
+    createdAt: row.created_at,
+  };
+}
+
+export function listContextTemplates(): ContextTemplate[] {
+  const db = getDatabase();
+  const stmt = db.prepare(
+    "SELECT id, name, content, created_at FROM context_templates ORDER BY created_at DESC",
+  );
+  const rows = stmt.all() as Array<{
+    id: string;
+    name: string;
+    content: string;
+    created_at: string;
+  }>;
+  return rows.map(mapContextRow);
+}
+
+export function getContextTemplate(id: string): ContextTemplate | undefined {
+  const db = getDatabase();
+  const stmt = db.prepare(
+    "SELECT id, name, content, created_at FROM context_templates WHERE id = ?",
+  );
+  const row = stmt.get(id) as
+    | {
+        id: string;
+        name: string;
+        content: string;
+        created_at: string;
+      }
+    | undefined;
+  return row ? mapContextRow(row) : undefined;
+}
+
+export function insertContextTemplate(
+  name: string,
+  content: string,
+): ContextTemplate {
+  const db = getDatabase();
+  const template: ContextTemplate = {
+    id: crypto.randomUUID(),
+    name,
+    content,
+    createdAt: new Date().toISOString(),
+  };
+  const stmt = db.prepare(
+    "INSERT INTO context_templates (id, name, content, created_at) VALUES (?, ?, ?, ?)",
+  );
+  stmt.run(template.id, template.name, template.content, template.createdAt);
+  return template;
+}
+
+export function updateContextTemplate(
+  id: string,
+  name: string,
+  content: string,
+): void {
+  const db = getDatabase();
+  const stmt = db.prepare(
+    "UPDATE context_templates SET name = ?, content = ? WHERE id = ?",
+  );
+  stmt.run(name, content, id);
+}
+
+export function deleteContextTemplate(id: string): void {
+  const db = getDatabase();
+  const stmt = db.prepare("DELETE FROM context_templates WHERE id = ?");
   stmt.run(id);
 }

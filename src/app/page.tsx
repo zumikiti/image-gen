@@ -1,17 +1,20 @@
 export const dynamic = "force-dynamic";
 
-import { listImages } from "@/lib/db";
+import { listContextTemplates, listImages } from "@/lib/db";
 import { GeneratorAndGallery } from "@/components/GeneratorAndGallery";
-import type { GeneratedImage } from "@/lib/types";
+import type { ContextTemplate, GeneratedImage } from "@/lib/types";
 
 export default async function Home() {
   let images: GeneratedImage[] = [];
+  let contexts: ContextTemplate[] = [];
 
   try {
     images = listImages();
+    contexts = listContextTemplates();
   } catch {
     // DB layer may be unimplemented in this worktree
     images = [];
+    contexts = [];
   }
 
   return (
@@ -21,7 +24,7 @@ export default async function Home() {
           画像生成ギャラリー
         </h1>
 
-        <GeneratorAndGallery images={images} />
+        <GeneratorAndGallery images={images} contexts={contexts} />
       </main>
     </div>
   );
