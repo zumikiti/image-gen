@@ -138,6 +138,12 @@ export default function (pi: ExtensionAPI) {
           description: "品質(auto / low / medium / high。既定は auto)",
         }),
       ),
+      title: Type.Optional(
+        Type.String({
+          description:
+            "画像に付ける任意のタイトル(100 文字まで。ギャラリーのカードに 1 行で出る)",
+        }),
+      ),
     }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const args = ["image", params.prompt];
@@ -148,6 +154,39 @@ export default function (pi: ExtensionAPI) {
       pushIfSet(args, "--model", params.model);
       pushIfSet(args, "--size", params.size);
       pushIfSet(args, "--quality", params.quality);
+      pushIfSet(args, "--title", params.title);
+      return {
+        content: [{ type: "text", text: await runCli(pi, ctx, signal, args) }],
+        details: undefined,
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "set_image_title",
+    label: "Set Image Title",
+    description:
+      "ギャラリーに保存済みの画像にタイトルを付け直す(空文字で解除)。結果は JSON で返る。",
+    promptSnippet: "Set or clear the title of a saved image in the gallery",
+    promptGuidelines: [
+      "Use set_image_title when the user wants to name an already generated image; generate_image takes a title at generation time instead.",
+    ],
+    parameters: Type.Object({
+      id: Type.String({
+        description: "対象の画像 ID(ギャラリーの API パス末尾)",
+      }),
+      title: Type.String({
+        description: "新しいタイトル。空文字ならタイトルを解除する",
+      }),
+    }),
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      const args = ["title", params.id];
+      // 空文字の位置引数は CLI に届かぬため、解除は --clear で表す
+      if (params.title.trim() === "") {
+        args.push("--clear");
+      } else {
+        args.push(params.title);
+      }
       return {
         content: [{ type: "text", text: await runCli(pi, ctx, signal, args) }],
         details: undefined,
