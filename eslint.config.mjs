@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // pi の拡張は pi 側のモジュールを解決するため、Next の lint 対象外にする
+    ".pi/**",
   ]),
 ]);
 

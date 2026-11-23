@@ -71,6 +71,23 @@ npm start -- -H 0.0.0.0 -p 3000
 
 `next dev` は既定で `0.0.0.0` に待つが、**LAN の IP で開くには** `next.config.ts` の `allowedDevOrigins` にそのホストを足す必要がある（Next.js 16 は開発中のクロスオリジン要求を遮断するため）。本番（`next start`）では不要である。
 
+## エージェント・CLI から使う
+
+画面を開かずに、プロンプト調整と画像生成を実行できる。生成結果はギャラリーに貯まる。
+
+```bash
+npm run gen -- contexts
+npm run gen -- prompt "赤い船" --context <id または名前>
+npm run gen -- image "赤い船" --cleanse --context <id または名前> \
+  --model mflux --size 1024x1024 --quality auto
+```
+
+- `contexts` は登録済みコンテキストを JSON で返す
+- `prompt` は調整後の文面だけを JSON で返す(画像は生成しない)
+- `image` は 1 枚生成して保存し、`id`・保存先・画像 API のパスを JSON で返す
+- `--cleanse` を付けると、生成前にローカルLLMでプロンプトを書き直す
+- このリポジトリで pi を起動すると、`.pi/extensions/image-gen.ts` が同じ処理を `cleanse_prompt` / `generate_image` ツールとして公開する
+
 ## データ
 
 - `data/app.db`（SQLite）と `data/images/<id>.png` に保存する。どちらも `.gitignore` 済みである
