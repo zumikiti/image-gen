@@ -28,14 +28,22 @@ export function ImageCard({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={`/api/images/${image.id}`}
-          alt={image.prompt}
+          alt={image.title ?? image.prompt}
           className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
           onClick={onImageClick}
         />
       </div>
 
-      {/* Actions */}
+      {/* Title + Actions。未設定のタイトルは行ごと出さぬ */}
       <div className="p-3">
+        {image.title && (
+          <p
+            className="mb-2 truncate text-sm font-medium text-foreground"
+            title={image.title}
+          >
+            {image.title}
+          </p>
+        )}
         <ImageActions
           onReusePrompt={onReusePrompt}
           onDelete={onDelete}

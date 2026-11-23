@@ -8,6 +8,7 @@ import {
   insertContextTemplate,
   insertImage,
   updateContextTemplate,
+  updateImageTitle,
 } from "@/lib/db";
 import { deleteImageFile, saveImageFile } from "@/lib/storage";
 import type {
@@ -19,8 +20,11 @@ import type {
 import { findModel } from "@/lib/models";
 import { generateImage } from "@/lib/generate";
 import { cleansePrompt } from "@/lib/cleanse";
+import { normalizeTitle } from "@/lib/title";
 
 type ContextSaveResult = { ok: true } | { ok: false; error: string };
+type TitleUpdateResult =
+  { ok: true; title: string | null } | { ok: false; error: string };
 type CleanseResult =
   { ok: true; prompt: string } | { ok: false; error: string };
 
@@ -38,6 +42,7 @@ export async function generateAction(
     const model = formData.get("model");
     const size = formData.get("size");
     const quality = formData.get("quality");
+    const rawTitle = formData.get("title");
 
     // 型チェックと値の確認
     if (typeof prompt !== "string" || !prompt.trim()) {
@@ -54,6 +59,15 @@ export async function generateAction(
 
     if (typeof quality !== "string" || !quality) {
       return { ok: false, error: "品質が選択されていません" };
+    }
+
+    // タイトルは任意。空なら未設定(null)として保存する
+    if (rawTitle !== null && typeof rawTitle !== "string") {
+      return { ok: false, error: "タイトルが不正です" };
+    }
+    const titleInput = normalizeTitle(rawTitle ?? "");
+    if (!titleInput.ok) {
+      return { ok: false, error: titleInput.error };
     }
 
     // モデル存在チェック
@@ -96,6 +110,7 @@ export async function generateAction(
     // DB に記録
     const image: GeneratedImage = {
       id,
+      title: titleInput.title,
       prompt: finalPrompt,
       model,
       size: size as Size,
@@ -136,6 +151,31 @@ export async function cleanseAction(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/**
+ * タイトルの登録・更新用サーバーアクション(ギャラリーのモーダルから呼ばれる)。
+ * 空文字で保存すればタイトル解除(null)になる。
+ */
+export async function updateTitleAction(
+  id: string,
+  rawTitle: string,
+): Promise<TitleUpdateResult> {
+  if (typeof id !== "string" || id.trim() === "") {
+    return { ok: false, error: "画像が指定されていません" };
+  }
+
+  const titleInput = normalizeTitle(rawTitle);
+  if (!titleInput.ok) {
+    return { ok: false, error: titleInput.error };
+  }
+
+  if (!updateImageTitle(id.trim(), titleInput.title)) {
+    return { ok: false, error: "画像が見つかりません" };
+  }
+
+  revalidatePath("/");
+  return { ok: true, title: titleInput.title };
 }
 
 /**

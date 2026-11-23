@@ -44,6 +44,14 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
     }
   };
 
+  /**
+   * revalidatePath で images props は更新されるが、モーダルが握る selectedImage は
+   * 古いままなので、保存できたタイトルをその場で差し替える
+   */
+  const handleTitleUpdated = (title: string | null) => {
+    setSelectedImage((current) => (current ? { ...current, title } : current));
+  };
+
   if (images.length === 0) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -76,6 +84,7 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
           onClose={() => setSelectedImage(null)}
           onReusePrompt={() => handleReuse(selectedImage, true)}
           onDelete={() => handleDelete(selectedImage)}
+          onTitleUpdated={handleTitleUpdated}
         />
       )}
     </>
