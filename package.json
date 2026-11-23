@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./tests/loader.mjs --test",
+    "gen": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env --import ./tests/loader.mjs src/cli.mts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
