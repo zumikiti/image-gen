@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { generateAction } from "@/app/actions";
+import { cleanseAction, generateAction } from "@/app/actions";
 import { MODEL_CATALOG, DEFAULT_MODEL_ID, findModel } from "@/lib/models";
 import type { ContextTemplate, GenerationResult } from "@/lib/types";
 
@@ -20,10 +20,12 @@ export function GenerationForm({
   contexts,
 }: GenerationFormProps) {
   const [selectedContextId, setSelectedContextId] = useState("");
-  const [state, formAction, isPending] = useActionState<
-    GenerationResult | null,
-    FormData
-  >(generateAction, null);
+  // 調整(cleanse)と生成を別アクションに分けたので、どちらを実行中かを保持する
+  const [phase, setPhase] = useState<"idle" | "cleansing" | "generating">(
+    "idle",
+  );
+  const [state, setState] = useState<GenerationResult | null>(null);
+  const isPending = phase !== "idle";
 
   const [selectedModelId, setSelectedModelId] = useState(DEFAULT_MODEL_ID);
   const defaultModel = findModel(DEFAULT_MODEL_ID);
@@ -68,6 +70,44 @@ export function GenerationForm({
     setSelectedModelId(e.target.value);
   };
 
+  // 調整が要るなら cleanseAction を先に呼び、その文面を generateAction へ渡す。
+  // 調整に失敗したら生成へ進まず、エラーだけ見せる。
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (isPending) return;
+
+    const formData = new FormData(e.currentTarget);
+    let promptText = String(formData.get("prompt") ?? "").trim();
+
+    if (formData.get("cleanse") === "on") {
+      setPhase("cleansing");
+      const cleansed = await cleanseAction(
+        promptText,
+        String(formData.get("context") ?? ""),
+      );
+      if (!cleansed.ok) {
+        setState({ ok: false, error: cleansed.error });
+        setPhase("idle");
+        return;
+      }
+      promptText = cleansed.prompt;
+      // 生成には調整後の文面を渡す(テキストエリアは書き戻さない)
+      formData.set("prompt", promptText);
+    }
+
+    setPhase("generating");
+    try {
+      setState(await generateAction(null, formData));
+    } catch (err) {
+      setState({
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setPhase("idle");
+    }
+  };
+
   // Ctrl/Cmd + Enter で送信。Enter 単独は改行のままにする
   const handlePromptKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (!(e.metaKey || e.ctrlKey) || e.key !== "Enter" || isPending) return;
@@ -77,7 +117,7 @@ export function GenerationForm({
 
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg shadow p-4 border border-zinc-200 dark:border-zinc-800">
-      <form action={formAction} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-3">
         {/* 常時表示: プロンプト / サイズ / 生成 */}
         <div className="flex flex-col sm:flex-row gap-3 sm:items-start">
           <div className="flex-1">
@@ -147,7 +187,7 @@ export function GenerationForm({
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  生成中…
+                  {phase === "cleansing" ? "プロンプト調整中…" : "画像生成中…"}
                 </>
               ) : (
                 "生成する"

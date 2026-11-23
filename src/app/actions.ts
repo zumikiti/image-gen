@@ -21,6 +21,8 @@ import { generateImage } from "@/lib/generate";
 import { cleansePrompt } from "@/lib/cleanse";
 
 type ContextSaveResult = { ok: true } | { ok: false; error: string };
+type CleanseResult =
+  { ok: true; prompt: string } | { ok: false; error: string };
 
 /**
  * 画像生成フォームから呼ばれるサーバーアクション。
@@ -36,8 +38,6 @@ export async function generateAction(
     const model = formData.get("model");
     const size = formData.get("size");
     const quality = formData.get("quality");
-    const cleanse = formData.get("cleanse") === "on";
-    const contextId = formData.get("context");
 
     // 型チェックと値の確認
     if (typeof prompt !== "string" || !prompt.trim()) {
@@ -78,16 +78,8 @@ export async function generateAction(
       };
     }
 
-    // 必要ならローカル LLM でプロンプトを練り直す。コンテキストがあれば添える。
-    // 実際に画像生成へ渡す文面を記録する(= レスポンスの内容)。
-    const context =
-      typeof contextId === "string" && contextId.trim() !== ""
-        ? getContextTemplate(contextId.trim())?.content
-        : undefined;
-
-    const finalPrompt = cleanse
-      ? await cleansePrompt(prompt.trim(), context)
-      : prompt.trim();
+    // 調整は cleanseAction が済ませている。ここは渡された文面をそのまま生成に使う。
+    const finalPrompt = prompt.trim();
 
     // 画像生成
     const id = crypto.randomUUID();
@@ -119,6 +111,30 @@ export async function generateAction(
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
     return { ok: false, error };
+  }
+}
+
+/**
+ * プロンプト調整用サーバーアクション。画像生成とは分け、クライアントが
+ * 「調整中」「生成中」を区別して表示できるようにする。画像は生成せず、
+ * 練り直した文面だけを返す。contextId があればその本文を添える。
+ */
+export async function cleanseAction(
+  rawPrompt: string,
+  contextId: string,
+): Promise<CleanseResult> {
+  if (!rawPrompt.trim()) {
+    return { ok: false, error: "プロンプトは空にできません" };
+  }
+  try {
+    const context =
+      contextId.trim() !== ""
+        ? getContextTemplate(contextId.trim())?.content
+        : undefined;
+    const prompt = await cleansePrompt(rawPrompt.trim(), context);
+    return { ok: true, prompt };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
 
