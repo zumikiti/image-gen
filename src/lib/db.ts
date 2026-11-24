@@ -145,6 +145,19 @@ export function deleteImage(id: string): void {
   stmt.run(id);
 }
 
+/**
+ * 複数 id を 1 トランザクションで削除する。
+ * 存在せぬ id は 0 行ヒットで無視される(呼び出し側は気にせず渡してよい)。
+ */
+export function deleteImages(ids: string[]): void {
+  if (ids.length === 0) return;
+
+  const db = getDatabase();
+  const placeholders = ids.map(() => "?").join(", ");
+  const stmt = db.prepare(`DELETE FROM images WHERE id IN (${placeholders})`);
+  db.transaction(() => stmt.run(...ids))();
+}
+
 function mapContextRow(row: {
   id: string;
   name: string;

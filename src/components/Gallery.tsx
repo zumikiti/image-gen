@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { deleteAction } from "@/app/actions";
+import { deleteAction, deleteManyAction } from "@/app/actions";
 import { matchesQuery } from "@/lib/search";
 import type { GeneratedImage } from "@/lib/types";
+import { BulkDeleteDialog } from "./BulkDeleteDialog";
 import { ImageCard } from "./ImageCard";
 import { ImageModal } from "./ImageModal";
+import { TrashIcon } from "./icons";
 
 interface GalleryProps {
   images: GeneratedImage[];
@@ -19,6 +21,13 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
   );
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  /**
+   * 一括削除の対象。検索語を変えても保持するのじゃ
+   * (非表示分も数えるが、確認モーダルが全件タイルを見せる)
+   */
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [, startTransition] = useTransition();
 
   // 全件が既に手元にあるので、絞り込みはクライアントで済ませる。
@@ -40,12 +49,63 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
     startTransition(async () => {
       try {
         await deleteAction(image.id);
-        // 削除した画像を開いたままにしない
+        // 削除した画像を開いたままにも、選択にも残さぬ
         setSelectedImage((current) =>
           current?.id === image.id ? null : current,
         );
+        setSelectedIds((current) => {
+          if (!current.has(image.id)) return current;
+          const next = new Set(current);
+          next.delete(image.id);
+          return next;
+        });
       } finally {
         setDeletingId(null);
+      }
+    });
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  /** 絞り込み中は見えておる分だけを選ぶ。画面と消えるものを一致させる */
+  const selectVisible = () => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const image of visibleImages) next.add(image.id);
+      return next;
+    });
+  };
+
+  const isEveryVisibleSelected =
+    visibleImages.length > 0 &&
+    visibleImages.every((image) => selectedIds.has(image.id));
+
+  /** 選択した順ではなく、一覧の並び順で見せる */
+  const selectedImages = useMemo(
+    () => images.filter((image) => selectedIds.has(image.id)),
+    [images, selectedIds],
+  );
+
+  const handleBulkDelete = () => {
+    setIsBulkDeleting(true);
+    startTransition(async () => {
+      try {
+        await deleteManyAction([...selectedIds]);
+        // 成功したときだけ閉じる。失敗すれば選択もモーダルも残り、そのまま再実行できる
+        setSelectedIds(new Set());
+        setIsConfirmOpen(false);
+      } finally {
+        setIsBulkDeleting(false);
       }
     });
   };
@@ -112,18 +172,67 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div
+          className={`grid grid-cols-2 sm:grid-cols-3 gap-4 ${
+            // 下部のバーに最後の行が隠れぬよう、選択中だけ余白を足す
+            selectedIds.size > 0 ? "pb-24" : ""
+          }`}
+        >
           {visibleImages.map((image) => (
             <ImageCard
               key={image.id}
               image={image}
-              isDeleting={deletingId === image.id}
+              isSelected={selectedIds.has(image.id)}
+              onToggleSelected={() => toggleSelected(image.id)}
               onImageClick={() => setSelectedImage(image)}
               onReusePrompt={() => handleReuse(image)}
-              onDelete={() => handleDelete(image)}
             />
           ))}
         </div>
+      )}
+
+      {selectedIds.size > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/95">
+          <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
+            <p className="text-sm font-medium text-foreground">
+              {selectedIds.size} 件選択中
+            </p>
+            <div className="ml-auto flex items-center gap-2">
+              {visibleImages.length > 0 && (
+                <button
+                  type="button"
+                  onClick={
+                    isEveryVisibleSelected
+                      ? () => setSelectedIds(new Set())
+                      : selectVisible
+                  }
+                  className="px-3 py-2 text-sm font-medium rounded bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  {isEveryVisibleSelected
+                    ? "全解除"
+                    : `表示中の ${visibleImages.length} 件を選択`}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsConfirmOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+              >
+                <TrashIcon className="w-4 h-4 shrink-0" />
+                削除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isConfirmOpen && (
+        <BulkDeleteDialog
+          images={selectedImages}
+          isDeleting={isBulkDeleting}
+          onCancel={() => setIsConfirmOpen(false)}
+          onConfirm={handleBulkDelete}
+        />
       )}
 
       {selectedImage && (
