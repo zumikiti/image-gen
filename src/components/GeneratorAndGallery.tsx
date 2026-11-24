@@ -8,6 +8,8 @@ import { Gallery } from "./Gallery";
 interface GeneratorAndGalleryProps {
   images: GeneratedImage[];
   contexts: ContextTemplate[];
+  /** URL の ?image= から決まった、最初に開く画像。無ければ null */
+  initialImageId: string | null;
 }
 
 /** トーストを出しておく時間 */
@@ -24,6 +26,7 @@ type Toast = { message: string; seq: number };
 export function GeneratorAndGallery({
   images,
   contexts,
+  initialImageId,
 }: GeneratorAndGalleryProps) {
   const [prompt, setPrompt] = useState("");
   const [toast, setToast] = useState<Toast | null>(null);
@@ -36,7 +39,7 @@ export function GeneratorAndGallery({
 
   /**
    * 流し込んだら true、上書き確認で取り止めたら false。
-   * 呼び出し側(モーダル)は、適用できたときだけ閉じる。
+   * 呼び出し側(ビューア)は、適用できたときだけ閉じる。
    */
   const handleReusePrompt = (next: string): boolean => {
     // 入力済みの内容を黙って捨てない。上書きの可否を利用者に委ねる
@@ -65,7 +68,11 @@ export function GeneratorAndGallery({
       </section>
 
       <section>
-        <Gallery images={images} onReusePrompt={handleReusePrompt} />
+        <Gallery
+          images={images}
+          initialImageId={initialImageId}
+          onReusePrompt={handleReusePrompt}
+        />
       </section>
 
       {toast && (

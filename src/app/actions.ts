@@ -98,7 +98,7 @@ export async function generateAction(
     saveImageFile(id, buffer);
 
     // DB に記録
-    // 画面の生成フォームはタイトルを訊かぬ。名付けはモーダル・API・CLI で行う
+    // 画面の生成フォームはタイトルを訊かぬ。名付けはビューア・API・CLI で行う
     const image: GeneratedImage = {
       id,
       title: null,
@@ -145,7 +145,7 @@ export async function cleanseAction(
 }
 
 /**
- * タイトルの登録・更新用サーバーアクション(ギャラリーのモーダルから呼ばれる)。
+ * タイトルの登録・更新用サーバーアクション(ビューアの面から呼ばれる)。
  * 空文字で保存すればタイトル解除(null)になる。
  */
 export async function updateTitleAction(
