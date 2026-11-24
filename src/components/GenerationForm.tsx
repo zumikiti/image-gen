@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { cleanseAction, generateAction } from "@/app/actions";
 import { MODEL_CATALOG, DEFAULT_MODEL_ID, findModel } from "@/lib/models";
-import { MAX_TITLE_LENGTH } from "@/lib/title";
 import type { ContextTemplate, GenerationResult } from "@/lib/types";
 
 interface GenerationFormProps {
@@ -26,8 +25,6 @@ export function GenerationForm({
     "idle",
   );
   const [state, setState] = useState<GenerationResult | null>(null);
-  // タイトルは任意。生成が成功したら空へ戻す(失敗時は入力を残す)
-  const [title, setTitle] = useState("");
   const isPending = phase !== "idle";
 
   const [selectedModelId, setSelectedModelId] = useState(DEFAULT_MODEL_ID);
@@ -62,12 +59,10 @@ export function GenerationForm({
     el.style.height = `${el.scrollHeight + border}px`;
   }, [prompt]);
 
-  // 生成が成功したら文面とタイトルを空に戻す(2 行へ縮む)
+  // 生成が成功したら文面を空に戻す(2 行へ縮む)
   useEffect(() => {
     if (state?.ok) {
       onPromptChange("");
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setTitle("");
     }
   }, [state, onPromptChange]);
 
@@ -123,23 +118,7 @@ export function GenerationForm({
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg shadow p-4 border border-zinc-200 dark:border-zinc-800">
       <form onSubmit={handleSubmit} className="space-y-3">
-        {/* 常時表示: タイトル(任意) / プロンプト / サイズ / 生成 */}
-        <div>
-          <label htmlFor="title" className="sr-only">
-            タイトル(任意)
-          </label>
-          <input
-            id="title"
-            name="title"
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={MAX_TITLE_LENGTH}
-            placeholder="タイトル(任意)"
-            disabled={isPending}
-            className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-foreground placeholder-zinc-400 dark:placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50"
-          />
-        </div>
+        {/* 常時表示: プロンプト / サイズ / 生成。タイトルは生成時には訊かず、後から付ける */}
 
         <div className="flex flex-col sm:flex-row gap-3 sm:items-start">
           <div className="flex-1">

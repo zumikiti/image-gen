@@ -42,7 +42,6 @@ export async function generateAction(
     const model = formData.get("model");
     const size = formData.get("size");
     const quality = formData.get("quality");
-    const rawTitle = formData.get("title");
 
     // 型チェックと値の確認
     if (typeof prompt !== "string" || !prompt.trim()) {
@@ -59,15 +58,6 @@ export async function generateAction(
 
     if (typeof quality !== "string" || !quality) {
       return { ok: false, error: "品質が選択されていません" };
-    }
-
-    // タイトルは任意。空なら未設定(null)として保存する
-    if (rawTitle !== null && typeof rawTitle !== "string") {
-      return { ok: false, error: "タイトルが不正です" };
-    }
-    const titleInput = normalizeTitle(rawTitle ?? "");
-    if (!titleInput.ok) {
-      return { ok: false, error: titleInput.error };
     }
 
     // モデル存在チェック
@@ -108,9 +98,10 @@ export async function generateAction(
     saveImageFile(id, buffer);
 
     // DB に記録
+    // 画面の生成フォームはタイトルを訊かぬ。名付けはモーダル・API・CLI で行う
     const image: GeneratedImage = {
       id,
-      title: titleInput.title,
+      title: null,
       prompt: finalPrompt,
       model,
       size: size as Size,
