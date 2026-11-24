@@ -8,6 +8,7 @@ import type { GeneratedImage } from "@/lib/types";
 import { ImageActions } from "./ImageActions";
 import { PixivPostPanel } from "./PixivPostPanel";
 import { DocumentDuplicateIcon, PencilIcon } from "./icons";
+import { useBodyScrollLock } from "./useBodyScrollLock";
 
 type CopyStatus = "idle" | "copied" | "failed";
 
@@ -41,25 +42,7 @@ export function ImageModal({
   const [titleError, setTitleError] = useState<string | null>(null);
   const [isSavingTitle, setIsSavingTitle] = useState(false);
 
-  // 開いておる間は背後のページをスクロールさせない。
-  // スクロールバーが消えるぶんの横ずれは padding で埋める
-  useEffect(() => {
-    const { body } = document;
-    const previousOverflow = body.style.overflow;
-    const previousPaddingRight = body.style.paddingRight;
-    const scrollbarWidth =
-      window.innerWidth - document.documentElement.clientWidth;
-
-    body.style.overflow = "hidden";
-    if (scrollbarWidth > 0) {
-      body.style.paddingRight = `${scrollbarWidth}px`;
-    }
-
-    return () => {
-      body.style.overflow = previousOverflow;
-      body.style.paddingRight = previousPaddingRight;
-    };
-  }, []);
+  useBodyScrollLock();
 
   // Escape は二段構え。編集中なら編集だけを取り消し、モーダルは閉じぬ
   useEffect(() => {
