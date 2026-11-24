@@ -118,7 +118,8 @@ export function GenerationForm({
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg shadow p-4 border border-zinc-200 dark:border-zinc-800">
       <form onSubmit={handleSubmit} className="space-y-3">
-        {/* 常時表示: プロンプト / サイズ / 生成 */}
+        {/* 常時表示: プロンプト / サイズ / 生成。タイトルは生成時には訊かず、後から付ける */}
+
         <div className="flex flex-col sm:flex-row gap-3 sm:items-start">
           <div className="flex-1">
             <label htmlFor="prompt" className="sr-only">

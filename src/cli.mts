@@ -7,7 +7,10 @@
  *   npm run gen -- contexts
  *   npm run gen -- prompt "赤い船" [--context <id または名前>]
  *   npm run gen -- image "赤い船" [--cleanse] [--context <id または名前>]
+ *                                 [--title "<タイトル>"]
  *                                 [--model mflux] [--size 1024x1024] [--quality auto]
+ *   npm run gen -- title <id> "<タイトル>"
+ *   npm run gen -- title <id> --clear
  *
  * 結果は JSON を stdout に、進捗やエラーは stderr に出す。
  */
@@ -15,8 +18,13 @@
 import { cleansePrompt } from "./lib/cleanse.ts";
 import { generateImage } from "./lib/generate.ts";
 import { DEFAULT_MODEL_ID, findModel } from "./lib/models.ts";
-import { insertImage, listContextTemplates } from "./lib/db.ts";
+import {
+  insertImage,
+  listContextTemplates,
+  updateImageTitle,
+} from "./lib/db.ts";
 import { saveImageFile } from "./lib/storage.ts";
+import { normalizeTitle } from "./lib/title.ts";
 import type { ContextTemplate, Quality, Size } from "./lib/types.ts";
 
 const DEFAULT_SIZE: Size = "1024x1024";
@@ -26,17 +34,26 @@ const USAGE = `使い方:
   npm run gen -- contexts
   npm run gen -- prompt "<プロンプト>" [--context <id または名前>]
   npm run gen -- image "<プロンプト>" [--cleanse] [--context <id または名前>]
-                                    [--model ${DEFAULT_MODEL_ID}] [--size ${DEFAULT_SIZE}] [--quality ${DEFAULT_QUALITY}]`;
+                                    [--title "<タイトル>"]
+                                    [--model ${DEFAULT_MODEL_ID}] [--size ${DEFAULT_SIZE}] [--quality ${DEFAULT_QUALITY}]
+  npm run gen -- title <id> "<タイトル>"
+  npm run gen -- title <id> --clear`;
 
 /** コマンドの使い方が誤っているときのエラー。終了コード 2 で終わる */
 class UsageError extends Error {}
 
 interface ParsedArgs {
-  command: "contexts" | "prompt" | "image";
+  command: "contexts" | "prompt" | "image" | "title";
   /** 位置引数(クォートされていなくても空白で連結する) */
   text: string;
+  /** 位置引数をそのまま並べたもの(title コマンドは id とタイトルを分けて読む) */
+  positional: string[];
   /** コンテキストの id または名前 */
   context?: string;
+  /** image 生成時に付けるタイトル */
+  title?: string;
+  /** title コマンドでタイトルを解除する */
+  clear: boolean;
   cleanse: boolean;
   model: string;
   size: Size;
@@ -56,7 +73,12 @@ function parseArgs(argv: string[]): ParsedArgs {
   if (command === "--help" || command === "-h") {
     throw new UsageError(USAGE);
   }
-  if (command !== "contexts" && command !== "prompt" && command !== "image") {
+  if (
+    command !== "contexts" &&
+    command !== "prompt" &&
+    command !== "image" &&
+    command !== "title"
+  ) {
     throw new UsageError(
       `未知のコマンド: ${command ?? "(未指定)"}\n\n${USAGE}`,
     );
@@ -64,6 +86,8 @@ function parseArgs(argv: string[]): ParsedArgs {
 
   const positional: string[] = [];
   let context: string | undefined;
+  let title: string | undefined;
+  let clear = false;
   let cleanse = false;
   let model: string = DEFAULT_MODEL_ID;
   let size: Size = DEFAULT_SIZE;
@@ -81,6 +105,13 @@ function parseArgs(argv: string[]): ParsedArgs {
       case "--context":
         context = takeValue(argv, i, "--context");
         i++;
+        break;
+      case "--title":
+        title = takeValue(argv, i, "--title");
+        i++;
+        break;
+      case "--clear":
+        clear = true;
         break;
       case "--model":
         model = takeValue(argv, i, "--model");
@@ -105,7 +136,10 @@ function parseArgs(argv: string[]): ParsedArgs {
   return {
     command,
     text: positional.join(" ").trim(),
+    positional,
     context,
+    title,
+    clear,
     cleanse,
     model,
     size,
@@ -163,6 +197,12 @@ async function runImage(args: ParsedArgs): Promise<void> {
     );
   }
 
+  // タイトルは生成前に検証する(20 分の生成を待ってから弾くのは無駄じゃ)
+  const titleInput = normalizeTitle(args.title ?? "");
+  if (!titleInput.ok) {
+    throw new UsageError(titleInput.error);
+  }
+
   const context = args.context
     ? resolveContext(args.context).content
     : undefined;
@@ -181,6 +221,7 @@ async function runImage(args: ParsedArgs): Promise<void> {
   saveImageFile(id, png);
   const image = {
     id,
+    title: titleInput.title,
     prompt,
     model: args.model,
     size: args.size,
@@ -202,6 +243,31 @@ async function runImage(args: ParsedArgs): Promise<void> {
   );
 }
 
+/** 既存の画像へタイトルを付け直す。--clear で解除する */
+async function runTitle(args: ParsedArgs): Promise<void> {
+  const [id, ...rest] = args.positional;
+  if (!id) {
+    throw new UsageError(`画像 ID が要ります\n\n${USAGE}`);
+  }
+  if (args.clear && rest.length > 0) {
+    throw new UsageError("--clear とタイトルは同時に指定できません");
+  }
+  if (!args.clear && rest.length === 0) {
+    throw new UsageError(`タイトルか --clear が要ります\n\n${USAGE}`);
+  }
+
+  const titleInput = normalizeTitle(args.clear ? "" : rest.join(" "));
+  if (!titleInput.ok) {
+    throw new UsageError(titleInput.error);
+  }
+
+  if (!updateImageTitle(id, titleInput.title)) {
+    throw new Error(`画像が見つかりません: ${id}`);
+  }
+
+  console.log(JSON.stringify({ id, title: titleInput.title }, null, 2));
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   switch (args.command) {
@@ -211,6 +277,8 @@ async function main(): Promise<void> {
       return runPrompt(args);
     case "image":
       return runImage(args);
+    case "title":
+      return runTitle(args);
   }
 }
 

@@ -32,6 +32,8 @@ export interface ModelDefinition {
 /** ギャラリーに並ぶ 1 件の生成結果。画像本体は /api/images/[id] で配信される */
 export interface GeneratedImage {
   id: string;
+  /** 任意の 1 行の名前。未設定は null(空文字では表さぬ) */
+  title: string | null;
   prompt: string;
   model: string;
   size: Size;
