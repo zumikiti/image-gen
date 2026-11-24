@@ -2,51 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { updateTitleAction } from "@/app/actions";
+import { copyText } from "@/lib/clipboard";
 import { MAX_TITLE_LENGTH } from "@/lib/title";
 import type { GeneratedImage } from "@/lib/types";
 import { ImageActions } from "./ImageActions";
+import { PixivPostPanel } from "./PixivPostPanel";
 import { DocumentDuplicateIcon, PencilIcon } from "./icons";
 
 type CopyStatus = "idle" | "copied" | "failed";
-
-/**
- * クリップボードへ書き込む。
- * navigator.clipboard は secure context(https / localhost)でしか使えず、
- * LAN の http で開いておると使えぬため、旧来の execCommand へ落とす。
- */
-async function copyText(text: string): Promise<boolean> {
-  if (window.isSecureContext && navigator.clipboard) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      // 権限拒否などはフォールバックへ回す
-    }
-  }
-
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.top = "0";
-  textarea.style.left = "0";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-
-  let copied = false;
-  try {
-    textarea.focus();
-    textarea.select();
-    textarea.setSelectionRange(0, text.length);
-    copied = document.execCommand("copy");
-  } catch {
-    copied = false;
-  } finally {
-    document.body.removeChild(textarea);
-  }
-
-  return copied;
-}
 
 interface ImageModalProps {
   image: GeneratedImage;
@@ -347,6 +310,9 @@ export function ImageModal({
               </p>
             </div>
           </div>
+
+          {/* pixiv 投稿の下ごしらえ */}
+          <PixivPostPanel image={image} />
 
           {/* Actions (modal footer) */}
           <ImageActions

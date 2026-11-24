@@ -5,6 +5,7 @@ import {
   deleteContextTemplate,
   deleteImage,
   getContextTemplate,
+  getImage,
   insertContextTemplate,
   insertImage,
   updateContextTemplate,
@@ -20,6 +21,8 @@ import type {
 import { findModel } from "@/lib/models";
 import { generateImage } from "@/lib/generate";
 import { cleansePrompt } from "@/lib/cleanse";
+import { draftPixivPost } from "@/lib/pixivDraft";
+import type { PixivDraft } from "@/lib/pixiv";
 import { normalizeTitle } from "@/lib/title";
 
 type ContextSaveResult = { ok: true } | { ok: false; error: string };
@@ -27,6 +30,8 @@ type TitleUpdateResult =
   { ok: true; title: string | null } | { ok: false; error: string };
 type CleanseResult =
   { ok: true; prompt: string } | { ok: false; error: string };
+type PixivDraftAction =
+  { ok: true; draft: PixivDraft } | { ok: false; error: string };
 
 /**
  * 画像生成フォームから呼ばれるサーバーアクション。
@@ -139,6 +144,33 @@ export async function cleanseAction(
         : undefined;
     const prompt = await cleansePrompt(rawPrompt.trim(), context);
     return { ok: true, prompt };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * pixiv 投稿の下書き作成用サーバーアクション(モーダルから呼ばれる)。
+ * 画像は生成せず、ローカル LLM に題名・タグ・キャプションを作らせて返す。
+ */
+export async function draftPixivAction(
+  imageId: string,
+): Promise<PixivDraftAction> {
+  if (typeof imageId !== "string" || imageId.trim() === "") {
+    return { ok: false, error: "画像が指定されていません" };
+  }
+
+  const image = getImage(imageId.trim());
+  if (!image) {
+    return { ok: false, error: "画像が見つかりません" };
+  }
+
+  try {
+    const draft = await draftPixivPost({
+      title: image.title,
+      prompt: image.prompt,
+    });
+    return { ok: true, draft };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
