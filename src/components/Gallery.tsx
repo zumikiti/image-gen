@@ -117,10 +117,7 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
             <ImageCard
               key={image.id}
               image={image}
-              isDeleting={deletingId === image.id}
               onImageClick={() => setSelectedImage(image)}
-              onReusePrompt={() => handleReuse(image)}
-              onDelete={() => handleDelete(image)}
             />
           ))}
         </div>

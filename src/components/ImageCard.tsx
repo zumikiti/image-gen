@@ -1,26 +1,16 @@
 "use client";
 
 import type { GeneratedImage } from "@/lib/types";
-import { ImageActions } from "./ImageActions";
 
 interface ImageCardProps {
   image: GeneratedImage;
   onImageClick: () => void;
-  onReusePrompt: () => void;
-  onDelete: () => void;
-  isDeleting?: boolean;
 }
 
 /**
- * 一覧に並ぶ 1 枚。写真と操作だけを見せ、プロンプト等の詳細はモーダルに任せる。
+ * 一覧に並ぶ 1 枚。絵と名前だけを見せ、詳細と操作はビューアに任せる。
  */
-export function ImageCard({
-  image,
-  onImageClick,
-  onReusePrompt,
-  onDelete,
-  isDeleting = false,
-}: ImageCardProps) {
+export function ImageCard({ image, onImageClick }: ImageCardProps) {
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg overflow-hidden shadow border border-zinc-200 dark:border-zinc-800 hover:shadow-lg transition-shadow">
       {/* Image container */}
@@ -37,23 +27,15 @@ export function ImageCard({
         />
       </div>
 
-      {/* Title + Actions。未設定のタイトルは行ごと出さぬ */}
-      <div className="p-3">
-        {image.title && (
-          <p
-            className="mb-2 truncate text-sm font-medium text-foreground"
-            title={image.title}
-          >
-            {image.title}
-          </p>
-        )}
-        <ImageActions
-          onReusePrompt={onReusePrompt}
-          onDelete={onDelete}
-          isDeleting={isDeleting}
-          iconOnly
-        />
-      </div>
+      {/* Title。未設定のタイトルは行ごと出さぬ */}
+      {image.title && (
+        <p
+          className="p-3 truncate text-sm font-medium text-foreground"
+          title={image.title}
+        >
+          {image.title}
+        </p>
+      )}
     </div>
   );
 }
