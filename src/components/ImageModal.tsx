@@ -7,7 +7,12 @@ import { MAX_TITLE_LENGTH } from "@/lib/title";
 import type { GeneratedImage } from "@/lib/types";
 import { ImageActions } from "./ImageActions";
 import { PixivPostPanel } from "./PixivPostPanel";
-import { DocumentDuplicateIcon, PencilIcon } from "./icons";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  DocumentDuplicateIcon,
+  PencilIcon,
+} from "./icons";
 import { useBodyScrollLock } from "./useBodyScrollLock";
 
 type CopyStatus = "idle" | "copied" | "failed";
@@ -15,6 +20,13 @@ type CopyStatus = "idle" | "copied" | "failed";
 interface ImageModalProps {
   image: GeneratedImage;
   isDeleting?: boolean;
+  /** 表示中の並びで、この画像が何番目か(1 始まり)。見つからねば null */
+  position: { current: number; total: number } | null;
+  /** 前後が無ければ端じゃ。ボタンは無効になり、キーも効かぬ */
+  hasPrevious: boolean;
+  hasNext: boolean;
+  onPrevious: () => void;
+  onNext: () => void;
   onClose: () => void;
   onReusePrompt: () => void;
   onDelete: () => void;
@@ -27,6 +39,11 @@ const PROMPT_CLAMP_CLASS = "line-clamp-3";
 export function ImageModal({
   image,
   isDeleting = false,
+  position,
+  hasPrevious,
+  hasNext,
+  onPrevious,
+  onNext,
   onClose,
   onReusePrompt,
   onDelete,
@@ -61,6 +78,37 @@ export function ImageModal({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose, isEditingTitle, image.title]);
+
+  // ←→ で前後へ。入力欄にフォーカスがある間は、文字カーソルの移動に譲る
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (e.key === "ArrowLeft") {
+        if (!hasPrevious) return;
+        e.preventDefault();
+        onPrevious();
+        return;
+      }
+      if (!hasNext) return;
+      e.preventDefault();
+      onNext();
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [hasPrevious, hasNext, onPrevious, onNext]);
 
   // 3 行に収まらないときだけ「全文を表示」を出す。折りたたんだ高さで測る
   useEffect(() => {
@@ -119,6 +167,33 @@ export function ImageModal({
       className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={onClose}
     >
+      {/* 前後への矢印はパネルの外、画面の左右端に据える。
+          狭い画面では画像の端に少しかかるゆえ、内側へ寄せるのじゃ */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onPrevious();
+        }}
+        disabled={!hasPrevious}
+        aria-label="前の画像"
+        className="absolute left-1 sm:left-6 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-black/40"
+      >
+        <ChevronLeftIcon className="w-6 h-6 shrink-0" />
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onNext();
+        }}
+        disabled={!hasNext}
+        aria-label="次の画像"
+        className="absolute right-1 sm:right-6 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-black/40"
+      >
+        <ChevronRightIcon className="w-6 h-6 shrink-0" />
+      </button>
+
       <div
         className="bg-white dark:bg-zinc-900 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-lg"
         onClick={(e) => e.stopPropagation()}
@@ -214,13 +289,21 @@ export function ImageModal({
         {/* Modal body */}
         <div className="p-6 space-y-6">
           {/* Image */}
-          <div className="bg-zinc-100 dark:bg-zinc-800 rounded-lg overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/api/images/${image.id}`}
-              alt={image.title ?? image.prompt}
-              className="w-full h-auto"
-            />
+          <div>
+            <div className="bg-zinc-100 dark:bg-zinc-800 rounded-lg overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/images/${image.id}`}
+                alt={image.title ?? image.prompt}
+                className="w-full h-auto"
+              />
+            </div>
+            {/* 何枚目か。端で止まるゆえ、果てまでの残りが測れる */}
+            {position && (
+              <p className="mt-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
+                {position.current} / {position.total}
+              </p>
+            )}
           </div>
 
           {/* Prompt */}
