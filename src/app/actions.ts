@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   deleteContextTemplate,
   deleteImage,
+  deleteImages,
   getContextTemplate,
   getImage,
   insertContextTemplate,
@@ -208,6 +209,23 @@ export async function updateTitleAction(
 export async function deleteAction(id: string): Promise<void> {
   deleteImage(id);
   deleteImageFile(id);
+  revalidatePath("/");
+}
+
+/**
+ * 一括削除用サーバーアクション。
+ * DB は 1 トランザクションで消し、ファイルは件数分だけ消す。
+ */
+export async function deleteManyAction(ids: string[]): Promise<void> {
+  const validIds = ids.filter(
+    (id) => typeof id === "string" && id.trim() !== "",
+  );
+  if (validIds.length === 0) return;
+
+  deleteImages(validIds);
+  for (const id of validIds) {
+    deleteImageFile(id);
+  }
   revalidatePath("/");
 }
 
