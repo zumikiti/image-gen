@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { deleteAction, deleteManyAction } from "@/app/actions";
 import { matchesQuery } from "@/lib/search";
 import type { GeneratedImage } from "@/lib/types";
@@ -11,7 +11,7 @@ import { TrashIcon } from "./icons";
 
 interface GalleryProps {
   images: GeneratedImage[];
-  /** カード/モーダルの「再利用」で、フォームの入力欄へ流し込む。適用したら true */
+  /** モーダルの「再利用」で、フォームの入力欄へ流し込む。適用したら true */
   onReusePrompt: (prompt: string) => boolean;
 }
 
@@ -26,9 +26,40 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
    * (非表示分も数えるが、確認モーダルが全件タイルを見せる)
    */
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  /**
+   * 編集モード中だけ選択できる。チェックボックスは置かず、タップで選ぶ
+   * (スマホは長押しで入る)
+   */
+  const [isEditing, setIsEditing] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [, startTransition] = useTransition();
+
+  /** 選択を終了すると選択も捨てる */
+  const exitEditing = () => {
+    setIsEditing(false);
+    setSelectedIds(new Set());
+  };
+
+  // Escape は二段構え。確認が開いていればそれを閉じ、次に編集モードを抜ける
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+
+      if (isConfirmOpen) {
+        if (isBulkDeleting) return;
+        setIsConfirmOpen(false);
+        return;
+      }
+      setIsEditing(false);
+      setSelectedIds(new Set());
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isEditing, isConfirmOpen, isBulkDeleting]);
 
   // 全件が既に手元にあるので、絞り込みはクライアントで済ませる。
   // deliberate: 件数が数千規模になり仮想スクロールやサーバー検索へ移すときは、
@@ -63,6 +94,12 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
         setDeletingId(null);
       }
     });
+  };
+
+  /** 長押しで編集モードに入り、その 1 枚を選んだ状態にする */
+  const startEditingWith = (id: string) => {
+    setIsEditing(true);
+    setSelectedIds((current) => new Set(current).add(id));
   };
 
   const toggleSelected = (id: string) => {
@@ -102,6 +139,7 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
       try {
         await deleteManyAction([...selectedIds]);
         // 成功したときだけ閉じる。失敗すれば選択もモーダルも残り、そのまま再実行できる
+        // 編集モードは抜けぬ。続けて片付けられるよう、選択だけを空にする
         setSelectedIds(new Set());
         setIsConfirmOpen(false);
       } finally {
@@ -111,8 +149,8 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
   };
 
   /** 上書き確認でキャンセルされた場合はモーダルを閉じない */
-  const handleReuse = (image: GeneratedImage, closeModal = false) => {
-    if (onReusePrompt(image.prompt) && closeModal) {
+  const handleReuse = (image: GeneratedImage) => {
+    if (onReusePrompt(image.prompt)) {
       setSelectedImage(null);
     }
   };
@@ -156,6 +194,15 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
             {visibleImages.length} 件
           </p>
         )}
+        {!isEditing && (
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            className="whitespace-nowrap px-3 py-2 text-sm font-medium rounded bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+          >
+            選択
+          </button>
+        )}
       </div>
 
       {visibleImages.length === 0 ? (
@@ -174,28 +221,31 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
       ) : (
         <div
           className={`grid grid-cols-2 sm:grid-cols-3 gap-4 ${
-            // 下部のバーに最後の行が隠れぬよう、選択中だけ余白を足す
-            selectedIds.size > 0 ? "pb-24" : ""
+            // 下部のバーに最後の行が隠れぬよう、編集モード中は余白を足す
+            isEditing ? "pb-24" : ""
           }`}
         >
           {visibleImages.map((image) => (
             <ImageCard
               key={image.id}
               image={image}
+              isEditing={isEditing}
               isSelected={selectedIds.has(image.id)}
+              onOpen={() => setSelectedImage(image)}
               onToggleSelected={() => toggleSelected(image.id)}
-              onImageClick={() => setSelectedImage(image)}
-              onReusePrompt={() => handleReuse(image)}
+              onLongPress={() => startEditingWith(image.id)}
             />
           ))}
         </div>
       )}
 
-      {selectedIds.size > 0 && (
+      {isEditing && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/95">
           <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
             <p className="text-sm font-medium text-foreground">
-              {selectedIds.size} 件選択中
+              {selectedIds.size > 0
+                ? `${selectedIds.size} 件選択中`
+                : "削除する画像を選ぶ"}
             </p>
             <div className="ml-auto flex items-center gap-2">
               {visibleImages.length > 0 && (
@@ -215,8 +265,16 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
               )}
               <button
                 type="button"
+                onClick={exitEditing}
+                className="px-3 py-2 text-sm font-medium rounded bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+              >
+                完了
+              </button>
+              <button
+                type="button"
                 onClick={() => setIsConfirmOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                disabled={selectedIds.size === 0}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600 transition-colors"
               >
                 <TrashIcon className="w-4 h-4 shrink-0" />
                 削除
@@ -240,7 +298,7 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
           image={selectedImage}
           isDeleting={deletingId === selectedImage.id}
           onClose={() => setSelectedImage(null)}
-          onReusePrompt={() => handleReuse(selectedImage, true)}
+          onReusePrompt={() => handleReuse(selectedImage)}
           onDelete={() => handleDelete(selectedImage)}
           onTitleUpdated={handleTitleUpdated}
         />
