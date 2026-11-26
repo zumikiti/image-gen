@@ -72,9 +72,30 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
     [images, query],
   );
 
+  /**
+   * 開いておる画像が、表示中の並びの何番目か。見つからねば -1
+   * deliberate: 位置の計算はここに閉じる(画面側にはテストの前例が無い)。
+   * 仮想スクロール等でこの画面を試す器を据えるときに lib へ抜き出す
+   */
+  const selectedIndex = selectedImage
+    ? visibleImages.findIndex((image) => image.id === selectedImage.id)
+    : -1;
+
+  const showImageAt = (index: number) => {
+    const next = visibleImages[index];
+    if (!next) return;
+    setSelectedImage(next);
+  };
+
   const handleDelete = (image: GeneratedImage) => {
     const confirmed = window.confirm("この画像を削除しますか?");
     if (!confirmed) return;
+
+    // 削除した後に開くのは、削除前の並びでの次の 1 枚。果てなら閉じる。
+    // revalidate 後の並びでは消した 1 枚が抜けて位置がずれるゆえ、ここで決める
+    const deletedIndex = visibleImages.findIndex((i) => i.id === image.id);
+    const nextImage =
+      deletedIndex >= 0 ? (visibleImages[deletedIndex + 1] ?? null) : null;
 
     setDeletingId(image.id);
     startTransition(async () => {
@@ -82,7 +103,7 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
         await deleteAction(image.id);
         // 削除した画像を開いたままにも、選択にも残さぬ
         setSelectedImage((current) =>
-          current?.id === image.id ? null : current,
+          current?.id === image.id ? nextImage : current,
         );
         setSelectedIds((current) => {
           if (!current.has(image.id)) return current;
@@ -293,10 +314,23 @@ export function Gallery({ images, onReusePrompt }: GalleryProps) {
         />
       )}
 
+      {/* 画像が変われば別の 1 枚じゃ。折り畳みや編集中の下書きを持ち越さぬよう作り直す */}
       {selectedImage && (
         <ImageModal
+          key={selectedImage.id}
           image={selectedImage}
           isDeleting={deletingId === selectedImage.id}
+          position={
+            selectedIndex >= 0
+              ? { current: selectedIndex + 1, total: visibleImages.length }
+              : null
+          }
+          hasPrevious={selectedIndex > 0}
+          hasNext={
+            selectedIndex >= 0 && selectedIndex < visibleImages.length - 1
+          }
+          onPrevious={() => showImageAt(selectedIndex - 1)}
+          onNext={() => showImageAt(selectedIndex + 1)}
           onClose={() => setSelectedImage(null)}
           onReusePrompt={() => handleReuse(selectedImage)}
           onDelete={() => handleDelete(selectedImage)}
