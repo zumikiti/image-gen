@@ -47,6 +47,8 @@ export function VideoForm({
   const [message, setMessage] = useState<{
     kind: "ok" | "error";
     text: string;
+    /** oMLX の解放についての一言(成功時のみ) */
+    note?: string;
   } | null>(null);
 
   const isPending = phase !== "idle";
@@ -107,6 +109,7 @@ export function VideoForm({
       setMessage({
         kind: "ok",
         text: "投入しました。完成まで 30 分ほどかかります",
+        note: result.note,
       });
       router.refresh();
     } catch (err) {
@@ -279,21 +282,27 @@ export function VideoForm({
               : "動画を作る"}
         </button>
         <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          1 本およそ 30 分。待ち行列に並ぶゆえ、続けて投入してもよい
+          1 本およそ 30 分。投入の前に oMLX のモデルを解放する
         </span>
       </div>
 
       {message && (
-        <p
-          role="status"
-          className={`text-sm ${
-            message.kind === "ok"
-              ? "text-emerald-600 dark:text-emerald-400"
-              : "text-red-600 dark:text-red-400"
-          }`}
-        >
-          {message.text}
-        </p>
+        <div role="status">
+          <p
+            className={`text-sm ${
+              message.kind === "ok"
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-red-600 dark:text-red-400"
+            }`}
+          >
+            {message.text}
+          </p>
+          {message.note && (
+            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+              {message.note}
+            </p>
+          )}
+        </div>
       )}
     </form>
   );

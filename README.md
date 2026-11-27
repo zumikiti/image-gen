@@ -84,6 +84,7 @@ mfluxible-server --host 0.0.0.0 --port 8420
 - 出力の `filename_prefix` は `video/<動画ID>` にするゆえ、ComfyUI 側の `output/` でも見分けられる
 - **1 本およそ 30 分**。同梱の `h3/skeleton.json` は 640×640・0.4MP・8 steps（turbo）で測った設定じゃ。尺を伸ばせば更にかかる
 - 投入は待たずに返る。一覧を開いておる間だけ 15 秒ごとに ComfyUI へ問い、完成した mp4 を `data/videos/<id>.mp4` に写す。ゆえに**誰も一覧を開かぬ間は回収されぬ**（ComfyUI の `output/` と history を消さなければ、後から開いたときに回収できる）
+- 投入の直前に **oMLX（ローカルLLM）のモデルを解放**し、メモリを ComfyUI に譲る。LLM が載ったままだと尺の長い生成が OOM で落ちるゆえじゃ。解放の鍵は `LOCAL_LLM_API_KEY` か `OXLM_API_KEY` を使い回す
 - 待ちは取り消せる。実行中のものを止めるときは、いま流れておる生成すべてが止まる（ComfyUI の `interrupt` じゃ）
 - 尺は 17k+5 フレームに丸まる（5 秒 → 124 フレーム = 5.17 秒）。画面には丸めた実尺を出す
 - 動画の生成は HTTP API では受け付けぬ。CLI も未対応じゃ（必要になったら `src/lib/videos.ts` に載せるだけで済む）

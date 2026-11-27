@@ -10,7 +10,14 @@ const DEFAULT_BASE_URL = "http://192.168.68.56:8888/v1";
 /** 既定の調整用モデル。環境変数 LOCAL_LLM_MODEL で上書き可 */
 const DEFAULT_MODEL = "gemma-4-31b-it-4bit";
 
-function requireApiKey(): string {
+/** ローカル LLM の根(OpenAI 互換の `/v1` を落としたもの)。oMLX の管理口もここにぶら下がる */
+export function localLlmRootUrl(): string {
+  const base = process.env.LOCAL_LLM_BASE_URL?.trim() || DEFAULT_BASE_URL;
+  return base.replace(/\/+$/, "").replace(/\/v1$/, "");
+}
+
+/** 調整にも解放にも同じ鍵を使う。未設定なら投げる */
+export function requireLocalLlmApiKey(): string {
   const apiKey =
     process.env.LOCAL_LLM_API_KEY?.trim() || process.env.OXLM_API_KEY?.trim();
   if (!apiKey) {
@@ -26,8 +33,8 @@ export interface ChatMessage {
   content: string;
 }
 
-/** エラーレスポンスの message を取り出す */
-async function extractErrorMessage(response: Response): Promise<string> {
+/** エラーレスポンスの message を取り出す(oMLX の解放でも使う) */
+export async function extractErrorMessage(response: Response): Promise<string> {
   let message = response.statusText;
   try {
     const body = (await response.json()) as { error?: { message?: string } };
@@ -54,7 +61,7 @@ export async function completeChat(messages: ChatMessage[]): Promise<string> {
   const response = await fetch(baseUrl, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${requireApiKey()}`,
+      Authorization: `Bearer ${requireLocalLlmApiKey()}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({

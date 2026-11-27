@@ -133,4 +133,10 @@ export interface VideoGenerationInput {
 }
 
 export type VideoGenerationResult =
-  { ok: true; video: GeneratedVideo } | { ok: false; error: string };
+  | {
+      ok: true;
+      video: GeneratedVideo;
+      /** 投入前に oMLX をどうしたか(画面に出す一言) */
+      note?: string;
+    }
+  | { ok: false; error: string };

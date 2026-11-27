@@ -326,7 +326,7 @@ export async function submitVideoAction(input: {
   }
 
   try {
-    const video = await createVideo({
+    const created = await createVideo({
       prompt,
       firstFrameImageId: input.firstFrameImageId.trim(),
       seconds,
@@ -334,7 +334,7 @@ export async function submitVideoAction(input: {
       seed,
     });
     revalidatePath("/videos");
-    return { ok: true, video };
+    return { ok: true, video: created.video, note: created.note };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
@@ -380,9 +380,9 @@ export async function retryVideoAction(
   }
 
   try {
-    const video = await retryVideo(id.trim());
+    const created = await retryVideo(id.trim());
     revalidatePath("/videos");
-    return { ok: true, video };
+    return { ok: true, video: created.video, note: created.note };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }

@@ -31,6 +31,7 @@ import {
   type ComfyHistoryEntry,
 } from "./comfyui";
 import { applyH3Overrides, framesForSeconds, type H3Graph } from "./h3Graph";
+import { unloadLocalLlmModels } from "./omlx";
 import {
   VIDEO_ASPECTS,
   VIDEO_SECONDS,
@@ -88,13 +89,19 @@ export function loadSkeleton(): H3Graph {
   return JSON.parse(raw) as H3Graph;
 }
 
+/** 投入の結果。`note` は oMLX の解放について画面へ出す一言じゃ */
+export interface CreatedVideo {
+  video: GeneratedVideo;
+  note: string;
+}
+
 /**
  * 動画を 1 本投入する。mp4 はまだ無い(完成は 30 分後じゃ)。
  * 戻り値は「待ち」の状態を持つ 1 件で、以後は `syncVideos` が面倒を見る。
  */
 export async function createVideo(
   input: VideoGenerationInput,
-): Promise<GeneratedVideo> {
+): Promise<CreatedVideo> {
   const image = getImage(input.firstFrameImageId);
   if (!image) {
     throw new Error("最初のコマに選んだ画像が見つかりません");
@@ -104,6 +111,10 @@ export async function createVideo(
   if (!png) {
     throw new Error("最初のコマに選んだ画像のファイルがありません");
   }
+
+  // ComfyUI は同じ Mac mini のメモリを総取りする。LLM のモデルが載ったままだと
+  // 尺の長い生成が OOM で落ちるゆえ、先に降ろしてから投入する
+  const unloaded = await unloadLocalLlmModels();
 
   const id = crypto.randomUUID();
   const frames = framesForSeconds(input.seconds);
@@ -139,7 +150,7 @@ export async function createVideo(
   };
   insertVideo(video);
 
-  return video;
+  return { video, note: unloaded.message };
 }
 
 /** 失敗の理由を history の messages から拾う */
@@ -266,7 +277,7 @@ export async function cancelVideo(id: string): Promise<void> {
  * 同じ条件でもう一度投入する。seed は引き直すゆえ、
  * 同じ絵から違う動きを試すのに使える。
  */
-export async function retryVideo(id: string): Promise<GeneratedVideo> {
+export async function retryVideo(id: string): Promise<CreatedVideo> {
   const video = getVideo(id);
   if (!video) throw new Error("動画が見つかりません");
   if (!video.firstFrameImageId) {
