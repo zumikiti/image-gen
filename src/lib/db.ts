@@ -1,4 +1,10 @@
-import type { ContextTemplate, GeneratedImage } from "./types";
+import type {
+  ContextTemplate,
+  GeneratedImage,
+  GeneratedVideo,
+  VideoAspect,
+  VideoStatus,
+} from "./types";
 import Database from "better-sqlite3";
 import * as fs from "fs";
 import * as path from "path";
@@ -41,6 +47,22 @@ function getDatabase(): Database.Database {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       content TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS videos (
+      id TEXT PRIMARY KEY,
+      title TEXT,
+      prompt TEXT NOT NULL,
+      first_frame_image_id TEXT,
+      aspect TEXT NOT NULL,
+      seconds REAL NOT NULL,
+      frames INTEGER NOT NULL,
+      seed INTEGER,
+      status TEXT NOT NULL,
+      comfy_prompt_id TEXT,
+      error TEXT,
       created_at TEXT NOT NULL
     )
   `);
@@ -236,4 +258,114 @@ export function deleteContextTemplate(id: string): void {
   const db = getDatabase();
   const stmt = db.prepare("DELETE FROM context_templates WHERE id = ?");
   stmt.run(id);
+}
+
+/** 動画の行(スネークケース)をドメインの型へ写す */
+function mapVideoRow(row: {
+  id: string;
+  title: string | null;
+  prompt: string;
+  first_frame_image_id: string | null;
+  aspect: string;
+  seconds: number;
+  frames: number;
+  seed: number | null;
+  status: string;
+  comfy_prompt_id: string | null;
+  error: string | null;
+  created_at: string;
+}): GeneratedVideo {
+  return {
+    id: row.id,
+    title: row.title ?? null,
+    prompt: row.prompt,
+    firstFrameImageId: row.first_frame_image_id ?? null,
+    aspect: row.aspect as VideoAspect,
+    seconds: row.seconds,
+    frames: row.frames,
+    seed: row.seed ?? null,
+    status: row.status as VideoStatus,
+    comfyPromptId: row.comfy_prompt_id ?? null,
+    error: row.error ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+const VIDEO_SELECT =
+  "SELECT id, title, prompt, first_frame_image_id, aspect, seconds, frames, seed, status, comfy_prompt_id, error, created_at FROM videos";
+
+export function insertVideo(video: GeneratedVideo): void {
+  const db = getDatabase();
+  const stmt = db.prepare(
+    `INSERT INTO videos (id, title, prompt, first_frame_image_id, aspect, seconds, frames, seed, status, comfy_prompt_id, error, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  stmt.run(
+    video.id,
+    video.title,
+    video.prompt,
+    video.firstFrameImageId,
+    video.aspect,
+    video.seconds,
+    video.frames,
+    video.seed,
+    video.status,
+    video.comfyPromptId,
+    video.error,
+    video.createdAt,
+  );
+}
+
+export function listVideos(): GeneratedVideo[] {
+  const db = getDatabase();
+  const stmt = db.prepare(`${VIDEO_SELECT} ORDER BY created_at DESC`);
+  return (stmt.all() as Parameters<typeof mapVideoRow>[0][]).map(mapVideoRow);
+}
+
+export function getVideo(id: string): GeneratedVideo | undefined {
+  const db = getDatabase();
+  const stmt = db.prepare(`${VIDEO_SELECT} WHERE id = ?`);
+  const row = stmt.get(id) as Parameters<typeof mapVideoRow>[0] | undefined;
+  return row ? mapVideoRow(row) : undefined;
+}
+
+/** タイトルを差し替える。空(null)は解除。対象が無ければ false */
+export function updateVideoTitle(id: string, title: string | null): boolean {
+  const db = getDatabase();
+  const stmt = db.prepare("UPDATE videos SET title = ? WHERE id = ?");
+  return stmt.run(title, id).changes > 0;
+}
+
+/**
+ * 状態を書き戻す。`comfyPromptId` を省けば今の値を保つゆえ、
+ * 状態だけを進めたいときに渡し直さずに済む。
+ */
+export function updateVideoState(
+  id: string,
+  state: {
+    status: VideoStatus;
+    comfyPromptId?: string;
+    error?: string | null;
+  },
+): void {
+  const db = getDatabase();
+  const stmt = db.prepare(
+    "UPDATE videos SET status = ?, comfy_prompt_id = COALESCE(?, comfy_prompt_id), error = ? WHERE id = ?",
+  );
+  stmt.run(state.status, state.comfyPromptId ?? null, state.error ?? null, id);
+}
+
+export function deleteVideo(id: string): void {
+  const db = getDatabase();
+  db.prepare("DELETE FROM videos WHERE id = ?").run(id);
+}
+
+/** 複数 id を 1 トランザクションで削除する。存在せぬ id は無視される */
+export function deleteVideos(ids: string[]): void {
+  if (ids.length === 0) return;
+
+  const db = getDatabase();
+  const placeholders = ids.map(() => "?").join(", ");
+  const stmt = db.prepare(`DELETE FROM videos WHERE id IN (${placeholders})`);
+  db.transaction(() => stmt.run(...ids))();
 }

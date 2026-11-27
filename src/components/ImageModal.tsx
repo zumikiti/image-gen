@@ -6,6 +6,7 @@ import { copyText } from "@/lib/clipboard";
 import { MAX_TITLE_LENGTH } from "@/lib/title";
 import type { GeneratedImage } from "@/lib/types";
 import { ImageActions } from "./ImageActions";
+import { originalUrl } from "@/lib/thumbnail";
 import { PixivPostPanel } from "./PixivPostPanel";
 import {
   ChevronLeftIcon,
@@ -293,7 +294,7 @@ export function ImageModal({
             <div className="bg-zinc-100 dark:bg-zinc-800 rounded-lg overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`/api/images/${image.id}`}
+                src={originalUrl(image.id)}
                 alt={image.title ?? image.prompt}
                 className="w-full h-auto"
               />
@@ -384,6 +385,7 @@ export function ImageModal({
           <ImageActions
             onReusePrompt={onReusePrompt}
             onDelete={onDelete}
+            videoHref={`/videos?first=${image.id}`}
             isDeleting={isDeleting}
           />
         </div>

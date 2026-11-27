@@ -63,3 +63,80 @@ export interface ContextTemplate {
   /** ISO 8601 */
   createdAt: string;
 }
+
+/**
+ * 動画生成(MiniMax H3 / ComfyUI)の状態。
+ * ComfyUI の queue と history を真実とし、こちらは写しを持つだけじゃ。
+ */
+export const VIDEO_STATUSES = [
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "canceled",
+] as const;
+export type VideoStatus = (typeof VIDEO_STATUSES)[number];
+
+/**
+ * 出力の縦横比。ComfyUI の ResolutionSelector が受ける値と同一じゃ
+ * (勝手に増やすと `POST /prompt` が 400 で弾かれる)。
+ */
+export const VIDEO_ASPECTS = [
+  "1:1 (Square)",
+  "2:3 (Portrait Photo)",
+  "3:2 (Photo)",
+  "3:4 (Portrait Standard)",
+  "4:3 (Standard)",
+  "9:16 (Portrait Widescreen)",
+  "16:9 (Widescreen)",
+  "21:9 (Ultrawide)",
+] as const;
+export type VideoAspect = (typeof VIDEO_ASPECTS)[number];
+
+/**
+ * 尺の受付範囲(秒)。5 秒で約 30 分かかるゆえ、上限は控えめにする。
+ * クライアントからも読むゆえ node 依存を持たぬここに置く。
+ */
+export const VIDEO_SECONDS = { min: 3, max: 10 } as const;
+
+/** 動画の 1 件。mp4 は /api/videos/[id] で配信される */
+export interface GeneratedVideo {
+  id: string;
+  /** 任意の 1 行の名前。未設定は null(空文字では表さぬ) */
+  title: string | null;
+  prompt: string;
+  /** 最初のコマに使った Gallery の画像。消えておれば null */
+  firstFrameImageId: string | null;
+  aspect: VideoAspect;
+  /** 要求した秒数 */
+  seconds: number;
+  /** 丸めた実フレーム数(17k+5)。実尺は frames / 24 秒 */
+  frames: number;
+  seed: number | null;
+  status: VideoStatus;
+  /** ComfyUI の prompt_id。状態照会と取り消しに使う */
+  comfyPromptId: string | null;
+  /** 失敗・取り消しの理由。成功時は null */
+  error: string | null;
+  /** ISO 8601 */
+  createdAt: string;
+}
+
+/** 動画生成の依頼。投入に要る最小限じゃ */
+export interface VideoGenerationInput {
+  prompt: string;
+  firstFrameImageId: string;
+  seconds: number;
+  aspect: VideoAspect;
+  /** 未指定なら乱数を振る */
+  seed?: number;
+}
+
+export type VideoGenerationResult =
+  | {
+      ok: true;
+      video: GeneratedVideo;
+      /** 投入前に oMLX をどうしたか(画面に出す一言) */
+      note?: string;
+    }
+  | { ok: false; error: string };

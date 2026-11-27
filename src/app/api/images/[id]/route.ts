@@ -1,5 +1,7 @@
 import { updateImageTitle } from "@/lib/db";
 import { readImageFile } from "@/lib/storage";
+import { getOrCreateThumb } from "@/lib/thumbs";
+import { parseThumbWidth, THUMB_WIDTH_RANGE } from "@/lib/thumbnail";
 import { normalizeTitle } from "@/lib/title";
 
 /** パストラバーサル対策。id に使える文字を絞る */
@@ -10,10 +12,14 @@ function jsonError(status: number, message: string): Response {
 }
 
 /**
- * 保存された画像をPNGで配信するAPIエンドポイント
+ * 保存された画像を配信するAPIエンドポイント。
+ *
+ * `?w=<幅>` を付けると、一覧のカード用に正方形へ切り抜いた webp を返す
+ * (初回だけ変換し、`data/thumbs` にキャッシュする)。
+ * 付けねば今までどおり原本の PNG を返すゆえ、詳細やピクシブの導線は変わらぬ。
  */
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const { id } = await params;
@@ -21,6 +27,31 @@ export async function GET(
   // IDの妥当性をチェック（パストラバーサル対策）
   if (!ID_PATTERN.test(id)) {
     return jsonError(400, "Invalid ID");
+  }
+
+  const requestedWidth = new URL(req.url).searchParams.get("w");
+  if (requestedWidth !== null) {
+    const width = parseThumbWidth(requestedWidth);
+    if (width === undefined) {
+      return jsonError(
+        400,
+        `w は ${THUMB_WIDTH_RANGE.min}〜${THUMB_WIDTH_RANGE.max} の整数で指定してください`,
+      );
+    }
+
+    const thumb = await getOrCreateThumb(id, width);
+    if (thumb) {
+      return new Response(new Uint8Array(thumb), {
+        status: 200,
+        headers: {
+          "Content-Type": "image/webp",
+          "Content-Length": String(thumb.length),
+          // id は内容に対して不変で、幅も URL に入っておるゆえ永久に効く
+          "Cache-Control": "public, max-age=31536000, immutable",
+        },
+      });
+    }
+    // 変換できなければ原本へ落ちる(下の PNG 配信へ)
   }
 
   // 画像ファイルを読み込む

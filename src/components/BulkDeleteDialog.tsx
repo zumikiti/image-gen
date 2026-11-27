@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import type { GeneratedImage } from "@/lib/types";
+import { thumbUrl } from "@/lib/thumbnail";
 import { useBodyScrollLock } from "./useBodyScrollLock";
 
 interface BulkDeleteDialogProps {
@@ -68,7 +69,7 @@ export function BulkDeleteDialog({
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`/api/images/${image.id}`}
+                  src={thumbUrl(image.id)}
                   alt={image.title ?? image.prompt}
                   loading="lazy"
                   decoding="async"

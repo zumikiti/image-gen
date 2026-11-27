@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowPathIcon, TrashIcon } from "./icons";
 
 interface ImageActionsProps {
@@ -7,6 +8,8 @@ interface ImageActionsProps {
   onReusePrompt: () => void;
   /** 画像を削除する。確認は呼び出し側が担う */
   onDelete: () => void;
+  /** この絵を最初のコマにして動画を作る行き先 */
+  videoHref: string;
   isDeleting?: boolean;
 }
 
@@ -17,6 +20,7 @@ interface ImageActionsProps {
 export function ImageActions({
   onReusePrompt,
   onDelete,
+  videoHref,
   isDeleting = false,
 }: ImageActionsProps) {
   return (
@@ -29,6 +33,12 @@ export function ImageActions({
         <ArrowPathIcon className="w-4 h-4 shrink-0" />
         再利用
       </button>
+      <Link
+        href={videoHref}
+        className="flex-1 gap-1.5 py-2 px-3 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 font-medium text-sm rounded transition-colors"
+      >
+        動かす
+      </Link>
       <button
         type="button"
         onClick={onDelete}

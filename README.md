@@ -1,17 +1,18 @@
 # image-gen
 
-OpenAI の画像生成 API、または手元の Mac で動かす **mflux**（OpenAI 互換サーバー）で画像を 1 枚ずつ生成し、ローカルに貯めて一覧で眺める個人用ツールである。localhost で単一ユーザーが使う前提で作ってある。
+OpenAI の画像生成 API、または手元の Mac で動かす **mflux**（OpenAI 互換サーバー）で画像を 1 枚ずつ生成し、ローカルに貯めて一覧で眺める個人用ツールである。できた画像 1 枚を種に、LAN の Mac mini で動く ComfyUI の **MiniMax H3** で短い動画も作れる。localhost で単一ユーザーが使う前提で作ってある。
 
 ## できること
 
 - プロンプトから画像を 1 枚生成（既定のモデルはローカルの mflux）
-- 生成結果を SQLite と PNG ファイルに保存し、ギャラリーに新しい順で並べる
+- 生成結果を SQLite と PNG ファイルに保存し、ギャラリーに新しい順で並べる（一覧のカードは正方形の webp に落として配信し、詳細では原本を出す）
 - カードから**プロンプトの再利用**、モーダルで**全文表示・コピー・削除**
 - 画像に任意の**タイトル**を付けて、あとからモーダル・HTTP API・CLI で登録・変更・解除
 - pixiv へ上げるための**投稿下書き**（題名・タグ・キャプション）を作り、画像と文面をクリップボードへ載せる
 - ギャラリーを**あいまい検索**で絞り込み（表記ゆれを吸収し、タイトルとプロンプトを対象に空白区切りで AND）
 - 「ローカルLLMでプロンプトを調整」で、プロンプトを画像生成向けに書き直してから生成（添えるコンテキストは管理画面 `/admin` で設定・保存・再利用できる）
 - モデル・サイズ・品質はカタログで宣言する（追加は定義 1 つ。用語は [CONTEXT.md](./CONTEXT.md) を参照）
+- 画像 1 枚を種に、ComfyUI の **MiniMax H3** で 5 秒ほどの**動画**を作り、専用の一覧（`/videos`）で待ち・完成・失敗を眺める
 - 画面を開かずに、CLI または pi のツールから同じ調整・生成を実行できる
 
 ## 必要環境
@@ -73,6 +74,36 @@ mfluxible-server --host 0.0.0.0 --port 8420
 - 起動後に `curl http://<host>:8420/health` で `model.name` を確かめ、`.env` の `MFLUX_MODEL` を合わせる
 - 初回起動は重みの取得と量子化で長い。大判（2048 系）は RAM と時間を食い、アプリ側は 20 分で打ち切る
 - 品質（`quality`）は mflux の互換端点では無視される（OpenAI 系では有効）
+
+## 動画生成（MiniMax H3 / ComfyUI）
+
+画像を 1 枚選び、ComfyUI の **MiniMax H3**（ImageToVideo）で 5 秒ほどの動画にする。一覧は `/videos` で、画像モーダルの「動かす」からも入れる。
+
+- ComfyUI は LAN の Mac mini（既定 `http://192.168.68.56:8188`）で動いておる前提じゃ。`.env` の `H3_BASE_URL` で差し替える
+- 最初のコマは **Gallery の画像だけ**から選ぶ。送った画像は ComfyUI の `input/` に残る（消す口が無いため掃除せぬ）
+- 出力の `filename_prefix` は `video/<動画ID>` にするゆえ、ComfyUI 側の `output/` でも見分けられる
+- **1 本およそ 30 分**。同梱の `h3/skeleton.json` は 640×640・0.4MP・8 steps（turbo）で測った設定じゃ。尺を伸ばせば更にかかる
+- 投入は待たずに返る。一覧を開いておる間だけ 15 秒ごとに ComfyUI へ問い、完成した mp4 を `data/videos/<id>.mp4` に写す。ゆえに**誰も一覧を開かぬ間は回収されぬ**（ComfyUI の `output/` と history を消さなければ、後から開いたときに回収できる）
+- 「ローカルLLMで H3 の型に整えてから投入」を選ぶと、`/videos` で選んだ**コンテキスト**をルールブックとして添えて書き直させる。コンテキストは画像と同じ表（`/admin` で管理）を使い回す。同梱の [h3/llm-context.md](./h3/llm-context.md) が H3 向けの型・禁則・尺の予算をまとめたもので、`/admin` に貼れば同じものが作れる
+- 投入の直前に **oMLX（ローカルLLM）のモデルを解放**し、メモリを ComfyUI に譲る。LLM が載ったままだと尺の長い生成が OOM で落ちるゆえじゃ。解放の鍵は `LOCAL_LLM_API_KEY` か `OXLM_API_KEY` を使い回す
+- 一覧では**再生を押すまで `<video>` を置かぬ**ゆえ、動画のファイルは押されるまで 1 バイトも取りに行かぬ（poster は元画像のサムネイル）
+- 待ちは取り消せる。実行中のものを止めるときは、いま流れておる生成すべてが止まる（ComfyUI の `interrupt` じゃ）
+- 尺は 17k+5 フレームに丸まる（5 秒 → 124 フレーム = 5.17 秒）。画面には丸めた実尺を出す
+- 動画の生成は HTTP API では受け付けぬ。CLI も未対応じゃ（必要になったら `src/lib/videos.ts` に載せるだけで済む）
+
+### skeleton を取り直す
+
+ComfyUI の UI で workflow を変えたら（ノードを足した、モデルを替えた）、`h3/skeleton.json` を取り直す。API 形式のグラフは `/history` から取れる。
+
+```bash
+curl -s 'http://192.168.68.56:8188/history?max_items=1' \
+  | python3 -c 'import sys,json;print(json.dumps(list(json.load(sys.stdin).values())[-1]["prompt"][2], indent=1, ensure_ascii=False))' \
+  > h3/skeleton.json
+```
+
+テンプレートは**不動**じゃ。前回ジョブのプロンプトや最初のコマを引き継がぬよう、投入のたびに上書きする。書き換えはノード ID ではなく `class_type` で探すゆえ、UI でノードを足し引きしても追従する（欠けておれば 30 分を無駄にせぬよう投入前に弾く）。
+
+> MiniMax H3 の重みは MiniMax H3 Community License じゃ。生成物を商用に使うには Comfy の商用ライセンスが要る。
 
 ## 起動
 
@@ -140,10 +171,11 @@ npm run gen -- title <id> --clear
 
 サーバーが公開する API は保存済み画像の配信とタイトルの更新のみで、生成は受け付けない。
 
-| メソッド | パス               | 内容                                                                      |
-| -------- | ------------------ | ------------------------------------------------------------------------- |
-| `GET`    | `/api/images/<id>` | `data/images/<id>.png` を `image/png` で返す。無ければ 404                |
-| `PATCH`  | `/api/images/<id>` | `{"title": "..."}` でタイトルを登録・変更。`null` か空文字で解除。422/404 |
+| メソッド | パス               | 内容                                                                                |
+| -------- | ------------------ | ----------------------------------------------------------------------------------- |
+| `GET`    | `/api/images/<id>` | `data/images/<id>.png` を `image/png` で返す。無ければ 404                          |
+| `GET`    | `/api/videos/<id>` | `data/videos/<id>.mp4` を `video/mp4` で返す。`Range` に応じる（206）。無ければ 404 |
+| `PATCH`  | `/api/videos/<id>` | `{"title": "..."}` でタイトルを登録・変更。`null` か空文字で解除。422/404           |
 
 ```bash
 curl -X PATCH http://localhost:3000/api/images/<id> \
@@ -154,7 +186,9 @@ curl -X PATCH http://localhost:3000/api/images/<id> \
 
 ## データ
 
-- `data/app.db`（SQLite）と `data/images/<id>.png` に保存する。どちらも `.gitignore` 済みである
+- `data/app.db`（SQLite）と `data/images/<id>.png`、`data/videos/<id>.mp4` に保存する。いずれも `.gitignore` 済みである
+- `data/thumbs/<id>@<幅>.webp` は一覧用の派生じゃ。原本を消せば同じ id の派生も消える（派生だけを消しても、次の表示で作り直される）
+- 動画の mp4 は ComfyUI の `output/` にも残る。こちらで消しても向こうは消えぬ（逆も同じ）
 - バックアップするならこの `data/` ごと控えること。消せば失われる
 
 ## 心得
