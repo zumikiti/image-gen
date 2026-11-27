@@ -5,20 +5,32 @@ import {
   deleteContextTemplate,
   deleteImage,
   deleteImages,
+  deleteVideo,
   getContextTemplate,
   getImage,
   insertContextTemplate,
   insertImage,
   updateContextTemplate,
   updateImageTitle,
+  updateVideoTitle,
 } from "@/lib/db";
-import { deleteImageFile, saveImageFile } from "@/lib/storage";
+import { deleteImageFile, deleteVideoFile, saveImageFile } from "@/lib/storage";
 import type {
   GeneratedImage,
   GenerationResult,
   Size,
   Quality,
+  VideoGenerationResult,
 } from "@/lib/types";
+import { VIDEO_SECONDS } from "@/lib/types";
+import {
+  cancelVideo,
+  createVideo,
+  isVideoAspect,
+  normalizeSeconds,
+  retryVideo,
+  syncVideos,
+} from "@/lib/videos";
 import { findModel } from "@/lib/models";
 import { generateImage } from "@/lib/generate";
 import { cleansePrompt } from "@/lib/cleanse";
@@ -31,6 +43,7 @@ type TitleUpdateResult =
   { ok: true; title: string | null } | { ok: false; error: string };
 type CleanseResult =
   { ok: true; prompt: string } | { ok: false; error: string };
+type VideoActionResult = { ok: true } | { ok: false; error: string };
 type PixivDraftAction =
   { ok: true; draft: PixivDraft } | { ok: false; error: string };
 
@@ -264,4 +277,144 @@ export async function deleteContextAction(id: string): Promise<void> {
   deleteContextTemplate(id);
   revalidatePath("/admin");
   revalidatePath("/");
+}
+
+/**
+ * 動画生成の投入。mp4 は 30 分後に出来るゆえ、ここでは待たずに
+ * 「待ち」の 1 件を返す。以後の進行は syncVideosAction が見回る。
+ */
+export async function submitVideoAction(input: {
+  prompt: string;
+  firstFrameImageId: string;
+  seconds: number;
+  aspect: string;
+  /** 空文字なら乱数で振る */
+  seed: string;
+}): Promise<VideoGenerationResult> {
+  const prompt = typeof input.prompt === "string" ? input.prompt.trim() : "";
+  if (!prompt) {
+    return { ok: false, error: "プロンプトは空にできません" };
+  }
+
+  if (
+    typeof input.firstFrameImageId !== "string" ||
+    input.firstFrameImageId.trim() === ""
+  ) {
+    return { ok: false, error: "最初のコマの画像を選んでください" };
+  }
+
+  const seconds = normalizeSeconds(input.seconds);
+  if (seconds === undefined) {
+    return {
+      ok: false,
+      error: `尺は ${VIDEO_SECONDS.min}〜${VIDEO_SECONDS.max} 秒の整数で指定してください`,
+    };
+  }
+
+  if (!isVideoAspect(input.aspect)) {
+    return { ok: false, error: "アスペクト比が不正です" };
+  }
+
+  let seed: number | undefined;
+  const rawSeed = typeof input.seed === "string" ? input.seed.trim() : "";
+  if (rawSeed !== "") {
+    const parsed = Number(rawSeed);
+    if (!Number.isSafeInteger(parsed) || parsed < 0) {
+      return { ok: false, error: "seed は 0 以上の整数で指定してください" };
+    }
+    seed = parsed;
+  }
+
+  try {
+    const video = await createVideo({
+      prompt,
+      firstFrameImageId: input.firstFrameImageId.trim(),
+      seconds,
+      aspect: input.aspect,
+      seed,
+    });
+    revalidatePath("/videos");
+    return { ok: true, video };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * 未完了の動画を ComfyUI に問い直し、完成品を回収する。
+ * 一覧を開いておる間、クライアントが繰り返し呼ぶ見回りじゃ。
+ */
+export async function syncVideosAction(): Promise<VideoActionResult> {
+  try {
+    await syncVideos();
+    revalidatePath("/videos");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 待ち・実行中の動画を取り消す。実行中のものを止めるゆえ、画面で確認を挟む */
+export async function cancelVideoAction(
+  id: string,
+): Promise<VideoActionResult> {
+  if (typeof id !== "string" || id.trim() === "") {
+    return { ok: false, error: "動画が指定されていません" };
+  }
+
+  try {
+    await cancelVideo(id.trim());
+    revalidatePath("/videos");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 同じ条件でもう一度投入する(seed は引き直す) */
+export async function retryVideoAction(
+  id: string,
+): Promise<VideoGenerationResult> {
+  if (typeof id !== "string" || id.trim() === "") {
+    return { ok: false, error: "動画が指定されていません" };
+  }
+
+  try {
+    const video = await retryVideo(id.trim());
+    revalidatePath("/videos");
+    return { ok: true, video };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 動画の削除。DB と mp4 の両方を消す(ComfyUI 側の出力は触らぬ) */
+export async function deleteVideoAction(id: string): Promise<void> {
+  if (typeof id !== "string" || id.trim() === "") return;
+
+  deleteVideo(id.trim());
+  deleteVideoFile(id.trim());
+  revalidatePath("/videos");
+}
+
+/** 動画のタイトル。画像と同じ正規化を通す(100 文字、空は未設定) */
+export async function updateVideoTitleAction(
+  id: string,
+  rawTitle: string,
+): Promise<TitleUpdateResult> {
+  if (typeof id !== "string" || id.trim() === "") {
+    return { ok: false, error: "動画が指定されていません" };
+  }
+
+  const titleInput = normalizeTitle(rawTitle);
+  if (!titleInput.ok) {
+    return { ok: false, error: titleInput.error };
+  }
+
+  if (!updateVideoTitle(id.trim(), titleInput.title)) {
+    return { ok: false, error: "動画が見つかりません" };
+  }
+
+  revalidatePath("/videos");
+  return { ok: true, title: titleInput.title };
 }

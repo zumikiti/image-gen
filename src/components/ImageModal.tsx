@@ -384,6 +384,7 @@ export function ImageModal({
           <ImageActions
             onReusePrompt={onReusePrompt}
             onDelete={onDelete}
+            videoHref={`/videos?first=${image.id}`}
             isDeleting={isDeleting}
           />
         </div>
