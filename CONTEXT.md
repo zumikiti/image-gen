@@ -11,6 +11,7 @@ _Avoid_: ジョブ、タスク(非同期の含みを持つため)
 **Video Generation(動画生成)**:
 ComfyUI(別 PC の Mac mini)の MiniMax H3 に投げる、1 本の動画を作る単位。Gallery の画像 1 枚を最初のコマに採り、プロンプト・アスペクト・尺・seed で構成される。
 Generation と違い **30 分ほどかかる非同期**ゆえ、状態は待ち(queued)・生成中(running)・完成(succeeded)・失敗(failed)・取り消し(canceled)の 5 つを持つ。状態の真実は ComfyUI の側(queue と history)にあり、こちらは prompt_id を持って訊きに行くだけじゃ。
+プロンプトの調整は Generation と同じコンテキスト表を使い回すが、H3 の型は別物ゆえ**ルールブック**としてシステム指示側に添える(画像用のように参照素材として user 側へ混ぜぬ)。
 完成した mp4 は `data/videos` に写し、専用の一覧(`/videos`)で眺める。Gallery には混ぜぬ。元の画像を消しても動画は残る。一覧の見出し画像には元の画像を使い、ffmpeg のサムネイル生成は挟まぬ。
 _Avoid_: ジョブ、クリップ、ムービー
 

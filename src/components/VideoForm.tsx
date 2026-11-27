@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { cleanseAction, submitVideoAction } from "@/app/actions";
+import { cleanseVideoAction, submitVideoAction } from "@/app/actions";
 import { framesForSeconds, secondsForFrames } from "@/lib/h3Graph";
 import { H3_PROMPT_TEMPLATE } from "@/lib/h3Prompt";
 import {
@@ -82,7 +82,7 @@ export function VideoForm({
     // 画像側と同じ調整の口を使う。型を守るのは雛形の役目ゆえ、調整は補助じゃ
     if (useCleanse) {
       setPhase("cleansing");
-      const cleansed = await cleanseAction(text, contextId);
+      const cleansed = await cleanseVideoAction(text, contextId, seconds);
       if (!cleansed.ok) {
         setMessage({ kind: "error", text: cleansed.error });
         setPhase("idle");
@@ -245,7 +245,7 @@ export function VideoForm({
             onChange={(e) => setUseCleanse(e.target.checked)}
             className="h-4 w-4"
           />
-          ローカルLLMで整えてから投入
+          ローカルLLMで H3 の型に整えてから投入
         </label>
 
         {useCleanse && (

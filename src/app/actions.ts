@@ -33,7 +33,7 @@ import {
 } from "@/lib/videos";
 import { findModel } from "@/lib/models";
 import { generateImage } from "@/lib/generate";
-import { cleansePrompt } from "@/lib/cleanse";
+import { cleansePrompt, cleanseVideoPrompt } from "@/lib/cleanse";
 import { draftPixivPost } from "@/lib/pixivDraft";
 import type { PixivDraft } from "@/lib/pixiv";
 import { normalizeTitle } from "@/lib/title";
@@ -157,6 +157,30 @@ export async function cleanseAction(
         ? getContextTemplate(contextId.trim())?.content
         : undefined;
     const prompt = await cleansePrompt(rawPrompt.trim(), context);
+    return { ok: true, prompt };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * 動画用のプロンプト調整。コンテキストは画像と同じ表から選ぶが、
+ * H3 の型は別物ゆえシステム指示と当て方(ルールブックとして添える)が違う。
+ */
+export async function cleanseVideoAction(
+  rawPrompt: string,
+  contextId: string,
+  seconds: number,
+): Promise<CleanseResult> {
+  if (!rawPrompt.trim()) {
+    return { ok: false, error: "プロンプトは空にできません" };
+  }
+  try {
+    const context =
+      contextId.trim() !== ""
+        ? getContextTemplate(contextId.trim())?.content
+        : undefined;
+    const prompt = await cleanseVideoPrompt(rawPrompt.trim(), context, seconds);
     return { ok: true, prompt };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };

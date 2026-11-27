@@ -84,6 +84,7 @@ mfluxible-server --host 0.0.0.0 --port 8420
 - 出力の `filename_prefix` は `video/<動画ID>` にするゆえ、ComfyUI 側の `output/` でも見分けられる
 - **1 本およそ 30 分**。同梱の `h3/skeleton.json` は 640×640・0.4MP・8 steps（turbo）で測った設定じゃ。尺を伸ばせば更にかかる
 - 投入は待たずに返る。一覧を開いておる間だけ 15 秒ごとに ComfyUI へ問い、完成した mp4 を `data/videos/<id>.mp4` に写す。ゆえに**誰も一覧を開かぬ間は回収されぬ**（ComfyUI の `output/` と history を消さなければ、後から開いたときに回収できる）
+- 「ローカルLLMで H3 の型に整えてから投入」を選ぶと、`/videos` で選んだ**コンテキスト**をルールブックとして添えて書き直させる。コンテキストは画像と同じ表（`/admin` で管理）を使い回す。同梱の [h3/llm-context.md](./h3/llm-context.md) が H3 向けの型・禁則・尺の予算をまとめたもので、`/admin` に貼れば同じものが作れる
 - 投入の直前に **oMLX（ローカルLLM）のモデルを解放**し、メモリを ComfyUI に譲る。LLM が載ったままだと尺の長い生成が OOM で落ちるゆえじゃ。解放の鍵は `LOCAL_LLM_API_KEY` か `OXLM_API_KEY` を使い回す
 - 待ちは取り消せる。実行中のものを止めるときは、いま流れておる生成すべてが止まる（ComfyUI の `interrupt` じゃ）
 - 尺は 17k+5 フレームに丸まる（5 秒 → 124 フレーム = 5.17 秒）。画面には丸めた実尺を出す
