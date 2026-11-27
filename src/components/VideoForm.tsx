@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { cleanseVideoAction, submitVideoAction } from "@/app/actions";
 import { framesForSeconds, secondsForFrames } from "@/lib/h3Graph";
 import { H3_PROMPT_TEMPLATE } from "@/lib/h3Prompt";
+import { thumbUrl } from "@/lib/thumbnail";
 import {
   VIDEO_ASPECTS,
   VIDEO_SECONDS,
@@ -181,7 +182,7 @@ export function VideoForm({
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`/api/images/${image.id}`}
+                    src={thumbUrl(image.id)}
                     alt={image.title ?? "無題"}
                     className="w-full h-full object-cover"
                   />

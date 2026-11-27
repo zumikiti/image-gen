@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { GeneratedImage } from "@/lib/types";
+import { thumbUrl } from "@/lib/thumbnail";
 import { CheckIcon } from "./icons";
 
 interface ImageCardProps {
@@ -122,7 +123,7 @@ export function ImageCard({
         {/* ファーストビュー外はブラウザに遅延させる。枠は aspect-square で確保済みじゃ */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`/api/images/${image.id}`}
+          src={thumbUrl(image.id)}
           alt=""
           loading="lazy"
           decoding="async"

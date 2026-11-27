@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { originalUrl } from "@/lib/thumbnail";
 import { draftPixivAction } from "@/app/actions";
 import { copyImage, copyText } from "@/lib/clipboard";
 import {
@@ -57,7 +58,7 @@ export function PixivPostPanel({ image }: PixivPostPanelProps) {
     let cancelled = false;
     void (async () => {
       try {
-        const response = await fetch(`/api/images/${image.id}`);
+        const response = await fetch(originalUrl(image.id));
         if (!response.ok) return;
         const blob = await response.blob();
         if (!cancelled) setImageBlob(blob);

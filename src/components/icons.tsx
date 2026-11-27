@@ -135,3 +135,17 @@ export function CheckIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+/** 再生。塗りで置く(動画のポスター上で押せることが伝わるように) */
+export function PlayIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M8.25 5.25v13.5a.75.75 0 0 0 1.147.638l10.5-6.75a.75.75 0 0 0 0-1.276l-10.5-6.75A.75.75 0 0 0 8.25 5.25Z" />
+    </svg>
+  );
+}

@@ -9,8 +9,10 @@ import {
   syncVideosAction,
   updateVideoTitleAction,
 } from "@/app/actions";
+import { PlayIcon } from "./icons";
 import { secondsForFrames } from "@/lib/h3Graph";
 import { MAX_TITLE_LENGTH } from "@/lib/title";
+import { thumbUrl } from "@/lib/thumbnail";
 import type { GeneratedVideo, VideoStatus } from "@/lib/types";
 
 /** 見回りの間隔。30 分待つ前では 15 秒の遅れは無に等しい */
@@ -49,6 +51,8 @@ export function VideoList({ videos }: { videos: GeneratedVideo[] }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  /** 再生を押された動画だけ `<video>` を置く。押すまで 1 バイトも取りに行かぬ */
+  const [playingId, setPlayingId] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState("");
 
   const unsettled = videos.filter(isUnsettled);
@@ -169,7 +173,7 @@ export function VideoList({ videos }: { videos: GeneratedVideo[] }) {
                 {video.firstFrameImageId ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={`/api/images/${video.firstFrameImageId}`}
+                    src={thumbUrl(video.firstFrameImageId)}
                     alt=""
                     className="w-full h-full object-cover"
                   />
@@ -277,14 +281,41 @@ export function VideoList({ videos }: { videos: GeneratedVideo[] }) {
               </div>
             </div>
 
-            {video.status === "succeeded" && (
-              <video
-                controls
-                preload="metadata"
-                src={`/api/videos/${video.id}`}
-                className="mt-3 w-full rounded-lg bg-black"
-              />
-            )}
+            {video.status === "succeeded" &&
+              (playingId === video.id ? (
+                <video
+                  autoPlay
+                  controls
+                  src={`/api/videos/${video.id}`}
+                  poster={
+                    video.firstFrameImageId
+                      ? thumbUrl(video.firstFrameImageId)
+                      : undefined
+                  }
+                  className="mt-3 w-full rounded-lg bg-black"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPlayingId(video.id)}
+                  aria-label="動画を再生"
+                  className="group relative mt-3 block aspect-video w-full overflow-hidden rounded-lg bg-black"
+                >
+                  {video.firstFrameImageId && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={thumbUrl(video.firstFrameImageId)}
+                      alt=""
+                      className="h-full w-full object-cover opacity-70 transition-opacity group-hover:opacity-85"
+                    />
+                  )}
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-zinc-900 shadow-lg">
+                      <PlayIcon className="h-6 w-6" />
+                    </span>
+                  </span>
+                </button>
+              ))}
           </li>
         ))}
       </ul>
